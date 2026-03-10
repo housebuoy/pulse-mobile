@@ -24,7 +24,7 @@ export const EditScreenInfo: React.FC<EditScreenInfoProps> = ({ path }) => {
 
 const styles = {
   codeHighlightContainer: `rounded-md px-1`,
-  getStartedContainer: `items-center mx-12`,
+  getStartedContainer: `items-center mx-12 bg-red-200`,
   getStartedText: `text-lg leading-6 text-center`,
   homeScreenFilename: `my-2`,
 };
