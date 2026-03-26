@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 export type ToastVariant = 'info' | 'warning' | 'error' | 'success' | 'tip';
 
 interface ToastBannerProps {
@@ -12,9 +11,8 @@ interface ToastBannerProps {
   title?: string;
   dismissible?: boolean;
   onDismiss?: () => void;
-  // NEW PROPS FOR FLOATING BEHAVIOR
   floating?: boolean; 
-  duration?: number; // How long it stays before auto-dismissing
+  duration?: number;
 }
 
 const VARIANT_CONFIG: Record<ToastVariant, any> = {
@@ -32,15 +30,16 @@ export function ToastBanner({
   dismissible = true,
   onDismiss,
   floating = false,
-  duration = 3000, // Auto-dismiss after 3 seconds
+  duration = 5000,
 }: ToastBannerProps) {
   const [visible, setVisible] = useState(true);
+  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const translateY = useRef(new Animated.Value(floating ? -100 : 0)).current;
   const opacity = useRef(new Animated.Value(floating ? 0 : 1)).current;
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    if (floating && visible) {
+    if (floating && visible && !isAnimatingOut) {
       // Animate in
       Animated.parallel([
         Animated.timing(translateY, { toValue: 0, duration: 300, useNativeDriver: true }),
@@ -51,12 +50,14 @@ export function ToastBanner({
       const timer = setTimeout(() => {
         handleDismiss();
       }, duration);
+      
       return () => clearTimeout(timer);
     }
-  }, [visible, floating]);
+  }, [visible, floating, isAnimatingOut, duration]);
 
   const handleDismiss = () => {
     if (floating) {
+      setIsAnimatingOut(true);
       // Animate out
       Animated.parallel([
         Animated.timing(translateY, { toValue: -100, duration: 300, useNativeDriver: true }),
@@ -71,7 +72,8 @@ export function ToastBanner({
     }
   };
 
-  if (!visible && !floating) return null;
+  // ✅ FIXED: Only return null when truly not visible
+  if (!visible) return null;
 
   const config = VARIANT_CONFIG[variant];
   const displayTitle = title ?? config.defaultTitle;
@@ -81,7 +83,7 @@ export function ToastBanner({
       styles.container,
       { backgroundColor: config.bg, borderColor: config.border },
       floating && styles.floatingContainer,
-      floating && { transform: [{ translateY }], opacity, top: insets.top + 10 }
+      floating && { transform: [{ translateY }], opacity, top: insets.top + -17 }
     ]}>
       <Ionicons name={config.icon} size={20} color={config.iconColor} style={styles.icon} />
       <View style={styles.textBlock}>
@@ -103,7 +105,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    zIndex: 999, // Make sure it sits on top of everything
+    zIndex: 999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,

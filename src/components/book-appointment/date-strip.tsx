@@ -91,7 +91,7 @@ export default function DateStrip({
         return (
           <TouchableOpacity
             key={item.fullDate}
-            onPress={() => !isBlocked && !isFull && onDateSelect(item.fullDate)}
+            onPress={() => onDateSelect(item.fullDate)}
             activeOpacity={isBlocked || isFull ? 1 : 0.75}
             style={[
               styles.card,
@@ -132,7 +132,9 @@ export default function DateStrip({
 
             {/* Closed dot */}
             {item.isDisabled && !item.isPast && (
-              <View style={styles.closedDot} />
+              <View style={styles.closedBadge}>
+                <Text style={styles.closedBadgeText}>Closed</Text>
+              </View>
             )}
           </TouchableOpacity>
         );
@@ -190,5 +192,13 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     marginTop: 2,
   },
+  closedBadge: {
+    backgroundColor: '#D1D5DB',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 999,
+    marginTop: 2,
+  },
   fullBadgeText: { fontSize: 9, fontWeight: '700', color: '#DC2626' },
+  closedBadgeText: { fontSize: 9, fontWeight: '700', color: '#6B7280' },
 });

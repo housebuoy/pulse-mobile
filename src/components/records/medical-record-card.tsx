@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome5, FontAwesome6, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons'; // <-- Import FontAwesome5 here
 import { COLORS } from '@/constants/theme';
+import { DEPARTMENT_CONFIG } from '@/constants/medical-category';
 
 interface MedicalRecordCardProps {
   department: string;
@@ -9,22 +10,42 @@ interface MedicalRecordCardProps {
   date: string;
   doctor: string;
   summary: string;
-  iconName: keyof typeof Ionicons.glyphMap;
-  iconBgColor: string;
-  iconColor: string;
   onPress: () => void;
 }
 
+
 export default function MedicalRecordCard({
-  department, hospital, date, doctor, summary, iconName, iconBgColor, iconColor, onPress
+  department, 
+  hospital, 
+  date, 
+  doctor, 
+  summary, 
+  onPress
 }: MedicalRecordCardProps) {
+
+  const config = DEPARTMENT_CONFIG[department] || DEPARTMENT_CONFIG['Default'];
+  const renderIcon = () => {
+    switch (config.family) {
+      case 'FontAwesome5':
+        return <FontAwesome5 name={config.name as any} size={22} color={config.color} />;
+      case 'FontAwesome6':
+        return <FontAwesome6 name={config.name as any} size={24} color={config.color} />;
+      case 'MaterialCommunityIcons':
+        return <MaterialCommunityIcons name={config.name as any} size={24} color={config.color} />;
+      case 'MaterialIcons':
+        return <MaterialIcons name={config.name as any} size={24} color={config.color} />;
+      case 'Ionicons':
+      default:
+        return <Ionicons name={config.name as any} size={24} color={config.color} />;
+    }
+  };
   return (
     <View style={styles.card}>
       <View style={styles.contentRow}>
         
-        {/* Dynamic Icon */}
-        <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
-          <Ionicons name={iconName} size={24} color={iconColor} />
+        {/* --- Dynamic Icon Renderer --- */}
+        <View style={[styles.iconContainer, { backgroundColor: config.bgColor }]}>
+          {renderIcon()}
         </View>
 
         {/* Text Content */}
@@ -62,7 +83,7 @@ export default function MedicalRecordCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20, // As explicitly requested!
+    borderRadius: 20, 
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,

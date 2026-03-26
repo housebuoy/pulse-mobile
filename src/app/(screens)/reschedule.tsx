@@ -9,28 +9,29 @@ import { ToastBanner, ToastVariant } from '@/components/ui/toast-banner';
 import MonthSelector from '@/components/book-appointment/month-selector';
 import DateStrip from '@/components/book-appointment/date-strip';
 
-const TIME_SLOTS = {
-  MORNING: [
-    { time: '9:00 AM', available: true },
-    { time: '10:30 AM', available: true },
-    { time: '11:15 AM', available: true },
-  ],
-  AFTERNOON: [
-    { time: '2:15 PM', available: true },
-    { time: '3:00 PM', available: true },
-    { time: '4:30 PM', available: true },
-    { time: '5:00 PM', available: false }, // Simulating a booked slot!
-  ],
-};
+// const TIME_SLOTS = {
+//   MORNING: [
+//     { time: '9:00 AM', available: true },
+//     { time: '10:30 AM', available: true },
+//     { time: '11:15 AM', available: true },
+//   ],
+//   AFTERNOON: [
+//     { time: '2:15 PM', available: true },
+//     { time: '3:00 PM', available: true },
+//     { time: '4:30 PM', available: true },
+//     { time: '5:00 PM', available: false }, // Simulating a booked slot!
+//   ],
+// };
 
 const HARDCODED_AVAILABILITY = {
-  closedDates: ['2026-03-26', '2023-10-22', '2023-10-29'], // e.g., Sundays
-  fullDates: ['2023-10-14'], // e.g., fully booked day
+  closedDates: ['2026-03-26', '2026-03-28', '2023-10-29'], // e.g., Sundays
+  fullDates: ['2026-03-27'], // e.g., fully booked day
   slots: {
     MORNING: [
-      { time: '9:00 AM', available: true },
+      // { time: '9:00 AM', available: true },
       { time: '10:30 AM', available: true },
       { time: '11:15 AM', available: true },
+      { time: '8:15 AM', available: true },
     ],
     AFTERNOON: [
       { time: '2:15 PM', available: true },
@@ -57,8 +58,11 @@ export default function RescheduleScreen() {
 
   const handleDateSelect = (fullDate: string) => {
     if (HARDCODED_AVAILABILITY.fullDates.includes(fullDate)) {
-      // Trigger the floating toast!
-      setToastData({ message: 'Dr. Arhin is fully booked on this date.', variant: 'error' });
+    // Trigger the floating toast!
+    setToastData({ message: 'Dr. Arhin is fully booked on this date.', variant: 'error' });
+    return;
+    }else if (HARDCODED_AVAILABILITY.closedDates.includes(fullDate)) {
+      setToastData({ message: 'KNUST Hospital is closed on this date.', variant: 'error' });
       return;
     }
     setSelectedDate(fullDate);
@@ -81,7 +85,15 @@ export default function RescheduleScreen() {
           message="Rescheduling will forfeit your current spot in the Live Queue."
           dismissible={false}
         />
-        
+        {toastData && (
+          <ToastBanner
+            floating={true}
+            variant={toastData.variant}
+            message={toastData.message}
+            onDismiss={() => setToastData(null)}
+          />
+        )}
+
         <View style={styles.summaryCard}>
           <View style={styles.iconContainer}>
             <Ionicons name="medical" size={20} color={COLORS.primary} />
@@ -105,15 +117,15 @@ export default function RescheduleScreen() {
         <DateStrip
           // currentMonth={currentMonth}
           selectedDate={selectedDate}
-          onDateSelect={setSelectedDate}
+          onDateSelect={handleDateSelect}
           disabledDates={HARDCODED_AVAILABILITY?.closedDates} // hospital closed days
           unavailableDates={HARDCODED_AVAILABILITY?.fullDates} // all slots taken
         />
-        y{/* --- TIME SLOTS --- */}
+        {/* --- TIME SLOTS --- */}
         <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 16 }]}>
           Available Slots
         </Text>
-        {Object.entries(TIME_SLOTS).map(([period, slots]) => (
+        {Object.entries(HARDCODED_AVAILABILITY.slots).map(([period, slots]) => (
           <View key={period} style={styles.timeGroup}>
             <Text style={styles.periodLabel}>{period}</Text>
             <View style={styles.timeGrid}>
@@ -153,19 +165,10 @@ export default function RescheduleScreen() {
           disabled={!selectedDate || !selectedTime}
           onPress={() => {
             // Here is where Zustand will eventually fire an action to update the queue!
-            router.push('/queue');
+            // handleDateSelect();
           }}
         />
       </View>
-
-      {toastData && (
-          <ToastBanner
-            floating={true}
-            variant={toastData.variant}
-            message={toastData.message}
-            onDismiss={() => setToastData(null)}
-          />
-        )}
     </SafeAreaView>
   );
 }

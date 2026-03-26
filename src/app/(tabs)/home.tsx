@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/theme';
 
 // Import our Lego Blocks! (Adjust paths based on exactly where you saved them)
@@ -12,6 +13,7 @@ import HealthTipBanner from '../../components/cards/health-tip-banner';
 import IconButton from '@/components/ui/header-badge';
 
 export default function HomeScreen() {
+  const router = useRouter();
   // Dynamic greeting based on time of day
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
@@ -53,7 +55,7 @@ export default function HomeScreen() {
             label="Book Slot"
             backgroundColor={COLORS.primaryLight}
             iconColor={COLORS.primary}
-            onPress={() => {}}
+            onPress={() => router.replace('/(tabs)/book-appointment')}
           />
           <QuickActionIcon
             iconName="folder-outline"

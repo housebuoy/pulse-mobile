@@ -71,14 +71,14 @@ export default function RecordsScreen() {
 
         {/* CHILD 2 — records */}
         <View style={styles.cardsWrapper}>
-          <MedicalRecordCard department="General OPD" hospital="KNUST University Hospital" date="12 Oct 2025" doctor="Dr. E. Arhin" summary="Treated for acute Malaria. Prescribed Artemether-Lumefantrine. Patient advised to rest and hydrate." iconName="heart-outline" iconBgColor="#DBEAFE" iconColor={COLORS.primary} onPress={() => {}} />
-          <MedicalRecordCard department="Dental Clinic" hospital="Komfo Anokye Teaching" date="04 Aug 2025" doctor="Dr. S. Mensah" summary="Routine cleaning and cavity filling (Tooth 14). Patient reported mild sensitivity." iconName="fitness-outline" iconBgColor="#D1FAE5" iconColor="#059669" onPress={() => {}} />
+          <MedicalRecordCard department="General OPD" hospital="KNUST University Hospital" date="12 Oct 2025" doctor="Dr. E. Arhin" summary="Treated for acute Malaria. Prescribed Artemether-Lumefantrine. Patient advised to rest and hydrate." onPress={() => {}} />
+          <MedicalRecordCard department="Dental Clinic" hospital="Komfo Anokye Teaching" date="04 Aug 2025" doctor="Dr. S. Mensah" summary="Routine cleaning and cavity filling (Tooth 14). Patient reported mild sensitivity." onPress={() => {}} />
           <View style={styles.dividerContainer}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>OLDER RECORDS</Text>
             <View style={styles.dividerLine} />
           </View>
-          <MedicalRecordCard department="Cardiology Dept" hospital="Korle-Bu Teaching Hospital" date="15 Feb 2024" doctor="Dr. K. Ofori" summary="Annual cardiac checkup. BP 120/80. ECG normal. No murmurs detected." iconName="pulse-outline" iconBgColor="#FFEDD5" iconColor="#EA580C" onPress={() => {}} />
+          <MedicalRecordCard department="Cardiology" hospital="Korle-Bu Teaching Hospital" date="15 Feb 2024" doctor="Dr. K. Ofori" summary="Annual cardiac checkup. BP 120/80. ECG normal. No murmurs detected." onPress={() => {}} />
         </View>
       </Animated.ScrollView>
     </SafeAreaView>
