@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "pulse-app",
+    "scheme": "pulse-app",
     "slug": "pulse-app",
     "version": "1.0.0",
     "web": {
@@ -9,7 +10,9 @@
     "experiments": {
       "tsconfigPaths": true
     },
-    "plugins": [],
+    "plugins": [
+      "expo-router"
+    ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -39,6 +42,7 @@
       }
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/adaptive-icon.png",
         "backgroundColor": "#ffffff"
