@@ -24,7 +24,6 @@ export default function QueueScreen() {
   // Placeholder actions
   const handleArrived = () => Alert.alert("Location Verified", "You are now marked as present in the waiting room.");
   const handleCancel = () => Alert.alert("Cancel Ticket", "Are you sure you want to cancel your queue ticket?", [{text: "No"}, {text: "Yes, Cancel", style: "destructive"}]);
-  const handleReschedule = () => Alert.alert("Reschedule", "Opening calendar to find a new time slot...");
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -55,7 +54,7 @@ export default function QueueScreen() {
           hospitalName="KNUST University Hospital"
           department="General OPD"
           doctorName="Dr. Arhin"
-          currentNumber={9}
+          currentNumber={4}
           userNumber={12}
           waitTimeMins={45}
           roomNumber="302"

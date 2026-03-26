@@ -82,6 +82,7 @@ export default function DateStrip({
       ref={scrollRef}
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={{flexGrow: 0}}
       contentContainerStyle={styles.scrollContent}>
       {days.map((item) => {
         const isSelected = selectedDate === item.fullDate;
@@ -148,6 +149,7 @@ const styles = StyleSheet.create({
 
   card: {
     width: 64,
+    height: 85,
     paddingVertical: 12,
     borderRadius: 16,
     alignItems: 'center',

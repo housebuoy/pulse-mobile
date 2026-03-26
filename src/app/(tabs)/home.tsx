@@ -37,7 +37,7 @@ export default function HomeScreen() {
         {/* --- 1. LIVE QUEUE HERO CARD --- */}
         <LiveQueueCard
           variant="home"
-          hospitalName="KNUST Hospital"
+          hospitalName="KNUST University Hospital"
           department="General OPD"
           doctorName="Dr. Arhin"
           waitTimeMins={45}

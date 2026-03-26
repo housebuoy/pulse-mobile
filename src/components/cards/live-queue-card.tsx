@@ -47,7 +47,6 @@ export default function LiveQueueCard({
 
   return (
     <View style={styles.card}>
-
       {/* ── TOP ROW: Live pill + wait time or QR ── */}
       <View style={styles.headerRow}>
         <View style={styles.livePill}>
@@ -72,8 +71,12 @@ export default function LiveQueueCard({
       </View>
 
       {/* ── HOSPITAL INFO ── */}
-      <Text style={styles.hospitalName}>{hospitalName}</Text>
-      <Text style={styles.doctorInfo}>{department} • {doctorName}</Text>
+      <Text style={styles.hospitalName} numberOfLines={2} ellipsizeMode="tail">
+        {hospitalName}
+      </Text>
+      <Text style={styles.doctorInfo}>
+        {department} • {doctorName}
+      </Text>
 
       {/* ── NUMBERS — different layout per variant ── */}
       {isHome ? (
@@ -125,8 +128,7 @@ export default function LiveQueueCard({
           <View style={styles.detailRow}>
             <Ionicons name="timer-outline" size={16} color="#93C5FD" />
             <Text style={styles.detailText}>
-              Estimated Wait:{' '}
-              <Text style={styles.detailBold}>~{waitTimeMins} mins</Text>
+              Estimated Wait: <Text style={styles.detailBold}>~{waitTimeMins} mins</Text>
             </Text>
           </View>
           {roomNumber && (
@@ -134,9 +136,7 @@ export default function LiveQueueCard({
               <Ionicons name="business-outline" size={16} color="#93C5FD" />
               <Text style={styles.detailText}>
                 Proceed to{' '}
-                <Text style={[styles.detailBold, styles.detailUnderline]}>
-                  Room {roomNumber}
-                </Text>{' '}
+                <Text style={[styles.detailBold, styles.detailUnderline]}>Room {roomNumber}</Text>{' '}
                 when called
               </Text>
             </View>
@@ -172,7 +172,6 @@ export default function LiveQueueCard({
           </TouchableOpacity>
         </View>
       )}
-
     </View>
   );
 }
@@ -215,7 +214,8 @@ const styles = StyleSheet.create({
 
   // QR button (queue)
   qrBtn: {
-    width: 40, height: 40,
+    width: 40,
+    height: 40,
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 10,
     alignItems: 'center',
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1,
     lineHeight: 14,
-    marginBottom: 2,  
+    marginBottom: 2,
   },
   nowServingValue: {
     color: '#fff',
@@ -336,13 +336,25 @@ const styles = StyleSheet.create({
   // Arrived / Cancel (queue)
   actionRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
   arrivedBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: '#fff', borderRadius: 14, paddingVertical: 14,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 14,
   },
   arrivedText: { fontSize: 14, fontWeight: '700', color: COLORS.textMain },
   cancelBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: '#fff', borderRadius: 14, paddingVertical: 14,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingVertical: 14,
   },
   cancelText: { fontSize: 14, fontWeight: '700', color: COLORS.danger },
 });

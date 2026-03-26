@@ -7,6 +7,7 @@ import MedicalIdBanner from '../../components/records/medical-banner';
 import RecordsTabs from '../../components/records/category-tab';
 import MedicalRecordCard from '../../components/records/medical-record-card';
 import IconButton from '@/components/ui/header-badge';
+import Divider from '@/components/ui/divider';
 
 const BANNER_HEIGHT = 90;
 
@@ -73,11 +74,7 @@ export default function RecordsScreen() {
         <View style={styles.cardsWrapper}>
           <MedicalRecordCard department="General OPD" hospital="KNUST University Hospital" date="12 Oct 2025" doctor="Dr. E. Arhin" summary="Treated for acute Malaria. Prescribed Artemether-Lumefantrine. Patient advised to rest and hydrate." onPress={() => {}} />
           <MedicalRecordCard department="Dental Clinic" hospital="Komfo Anokye Teaching" date="04 Aug 2025" doctor="Dr. S. Mensah" summary="Routine cleaning and cavity filling (Tooth 14). Patient reported mild sensitivity." onPress={() => {}} />
-          <View style={styles.dividerContainer}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OLDER RECORDS</Text>
-            <View style={styles.dividerLine} />
-          </View>
+          <Divider label="OLDER RECORDS" thickness={2}/>
           <MedicalRecordCard department="Cardiology" hospital="Korle-Bu Teaching Hospital" date="15 Feb 2024" doctor="Dr. K. Ofori" summary="Annual cardiac checkup. BP 120/80. ECG normal. No murmurs detected." onPress={() => {}} />
         </View>
       </Animated.ScrollView>
