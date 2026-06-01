@@ -16,6 +16,7 @@ import DateStrip from '@/components/book-appointment/date-strip';
 import MonthSelector from '@/components/book-appointment/month-selector';
 import TimeSlotPicker, { TimeSlot } from '@/components/book-appointment/time-slot-picker';
 import Divider from '@/components/ui/divider';
+import Dropdown, { DropdownOption } from '@/components/ui/dropdown-menu';
 
 // const { width, height } = Dimensions.get('window');
 const HEADER_HEIGHT = 280; // Total height of the image area
@@ -35,7 +36,13 @@ const HOSPITAL = {
   status: 'Open 24/7',
 };
 
-const DEPARTMENTS = ['General OPD', 'Dental Clinic', 'Eye Clinic', 'Cardiology'];
+const DEPARTMENTS: DropdownOption[] = [
+  { label: 'General OPD', value: 'general' },
+  { label: 'Cardiology', value: 'cardiology' },
+  { label: 'Dental Clinic', value: 'dental' },
+  { label: 'Eye Clinic', value: 'eye' },
+  { label: 'Pediatrics', value: 'pediatrics' },
+];
 
 const slots: TimeSlot[] = [
   { time: '10:30 AM', available: true },
@@ -55,7 +62,7 @@ export default function HospitalDetailsScreen() {
   const router = useRouter();
 
   // --- State ---
-  const [selectedDepartment, setSelectedDepartment] = useState(DEPARTMENTS[0]);
+  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
@@ -159,10 +166,13 @@ export default function HospitalDetailsScreen() {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.dropdownSelector}>
-            <Text style={styles.dropdownText}>{selectedDepartment}</Text>
-            <Ionicons name="chevron-down" size={20} color="#6B7280" />
-          </TouchableOpacity>
+          <Dropdown
+            label="Department"
+            options={DEPARTMENTS}
+            selected={selectedDepartment}
+            onSelect={setSelectedDepartment}
+            placeholder="Select a department"
+          />
 
           {/* 4. Date Selector */}
           <View style={[styles.sectionHeader, { marginTop: 24 }]}>
