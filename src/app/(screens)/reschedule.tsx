@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,44 +8,20 @@ import CustomButton from '@/components/ui/custom-button';
 import { ToastBanner, ToastVariant } from '@/components/ui/toast-banner';
 import MonthSelector from '@/components/book-appointment/month-selector';
 import DateStrip from '@/components/book-appointment/date-strip';
+import {
+  fetchMockAvailability,
+  HospitalAvailability,
+  MockTimeSlot,
+} from '@/services/mock/hospital-schedule';
+import { useQueueStore } from '@/stores/queue-store';
 
-// const TIME_SLOTS = {
-//   MORNING: [
-//     { time: '9:00 AM', available: true },
-//     { time: '10:30 AM', available: true },
-//     { time: '11:15 AM', available: true },
-//   ],
-//   AFTERNOON: [
-//     { time: '2:15 PM', available: true },
-//     { time: '3:00 PM', available: true },
-//     { time: '4:30 PM', available: true },
-//     { time: '5:00 PM', available: false }, // Simulating a booked slot!
-//   ],
-// };
+const HOSPITAL_ID = 'knust-university-hospital';
 
-const HARDCODED_AVAILABILITY = {
-  closedDates: ['2026-03-26', '2026-03-28', '2023-10-29'], // e.g., Sundays
-  fullDates: ['2026-03-27'], // e.g., fully booked day
-  slots: {
-    MORNING: [
-      // { time: '9:00 AM', available: true },
-      { time: '10:30 AM', available: true },
-      { time: '11:15 AM', available: true },
-      { time: '8:15 AM', available: true },
-    ],
-    AFTERNOON: [
-      { time: '2:15 PM', available: true },
-      { time: '3:00 PM', available: true },
-      { time: '4:30 PM', available: true },
-      { time: '5:00 PM', available: false }, // Simulating a booked slot
-    ],
-  },
-};
 export default function RescheduleScreen() {
   const router = useRouter();
+  const ticket = useQueueStore((state) => state.ticket);
 
   // State for the selected options
-  // const [selectedDate, setSelectedDate] = useState(DATES[0].fullDate);
   const [selectedTime, setSelectedTime] = useState<string | null>('10:30 AM');
   const [currentMonth, setCurrentMonth] = useState(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -56,12 +32,34 @@ export default function RescheduleScreen() {
     null
   );
 
+  // --- Availability now comes from the shared mock service instead of a
+  // hardcoded literal, so this screen and Hospital Details read the same
+  // source. ---
+  const [availability, setAvailability] = useState<HospitalAvailability | null>(null);
+  const [loadingAvailability, setLoadingAvailability] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingAvailability(true);
+    fetchMockAvailability(HOSPITAL_ID, currentMonth).then((data) => {
+      if (!cancelled) {
+        setAvailability(data);
+        setLoadingAvailability(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentMonth]);
+
+  const daySlots = availability?.slots[selectedDate] ?? { MORNING: [], AFTERNOON: [] };
+
   const handleDateSelect = (fullDate: string) => {
-    if (HARDCODED_AVAILABILITY.fullDates.includes(fullDate)) {
+    if (availability?.fullDates.includes(fullDate)) {
     // Trigger the floating toast!
     setToastData({ message: 'Dr. Arhin is fully booked on this date.', variant: 'error' });
     return;
-    }else if (HARDCODED_AVAILABILITY.closedDates.includes(fullDate)) {
+    }else if (availability?.closedDates.includes(fullDate)) {
       setToastData({ message: 'KNUST Hospital is closed on this date.', variant: 'error' });
       return;
     }
@@ -99,8 +97,8 @@ export default function RescheduleScreen() {
             <Ionicons name="medical" size={20} color={COLORS.primary} />
           </View>
           <View>
-            <Text style={styles.summaryTitle}>General OPD • Dr. Arhin</Text>
-            <Text style={styles.summarySubtitle}>KNUST University Hospital</Text>
+            <Text style={styles.summaryTitle}>{ticket.department} • {ticket.doctorName}</Text>
+            <Text style={styles.summarySubtitle}>{ticket.hospitalName}</Text>
           </View>
         </View>
         <View style={styles.sectionHeaderRow}>
@@ -118,44 +116,50 @@ export default function RescheduleScreen() {
           // currentMonth={currentMonth}
           selectedDate={selectedDate}
           onDateSelect={handleDateSelect}
-          disabledDates={HARDCODED_AVAILABILITY?.closedDates} // hospital closed days
-          unavailableDates={HARDCODED_AVAILABILITY?.fullDates} // all slots taken
+          disabledDates={availability?.closedDates ?? []} // hospital closed days
+          unavailableDates={availability?.fullDates ?? []} // all slots taken
         />
         {/* --- TIME SLOTS --- */}
         <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 16 }]}>
           Available Slots
         </Text>
-        {Object.entries(HARDCODED_AVAILABILITY.slots).map(([period, slots]) => (
-          <View key={period} style={styles.timeGroup}>
-            <Text style={styles.periodLabel}>{period}</Text>
-            <View style={styles.timeGrid}>
-              {slots.map((slot) => {
-                const isSelected = selectedTime === slot.time;
-                return (
-                  <TouchableOpacity
-                    key={slot.time}
-                    disabled={!slot.available}
-                    style={[
-                      styles.timePill,
-                      isSelected && styles.timePillActive,
-                      !slot.available && styles.timePillDisabled,
-                    ]}
-                    onPress={() => setSelectedTime(slot.time)}
-                    activeOpacity={0.7}>
-                    <Text
-                      style={[
-                        styles.timeText,
-                        isSelected && styles.timeTextActive,
-                        !slot.available && styles.timeTextDisabled,
-                      ]}>
-                      {slot.time}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+        {loadingAvailability ? (
+          <View style={styles.loadingSlots}>
+            <ActivityIndicator color={COLORS.primary} />
           </View>
-        ))}
+        ) : (
+          Object.entries(daySlots).map(([period, slots]: [string, MockTimeSlot[]]) => (
+            <View key={period} style={styles.timeGroup}>
+              <Text style={styles.periodLabel}>{period}</Text>
+              <View style={styles.timeGrid}>
+                {slots.map((slot) => {
+                  const isSelected = selectedTime === slot.time;
+                  return (
+                    <TouchableOpacity
+                      key={slot.time}
+                      disabled={!slot.available}
+                      style={[
+                        styles.timePill,
+                        isSelected && styles.timePillActive,
+                        !slot.available && styles.timePillDisabled,
+                      ]}
+                      onPress={() => setSelectedTime(slot.time)}
+                      activeOpacity={0.7}>
+                      <Text
+                        style={[
+                          styles.timeText,
+                          isSelected && styles.timeTextActive,
+                          !slot.available && styles.timeTextDisabled,
+                        ]}>
+                        {slot.time}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ))
+        )}
       </ScrollView>
 
       {/* --- STICKY BOTTOM FOOTER --- */}
@@ -313,6 +317,10 @@ const styles = StyleSheet.create({
   },
 
   // Time Slots
+  loadingSlots: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
   timeGroup: {
     marginBottom: 24,
   },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,9 +8,11 @@ import { COLORS } from '@/constants/theme';
 import ProfileHeader from '../../components/profile/profile-header';
 import SettingsCard from '../../components/profile/settings-card';
 import SettingsRow from '../../components/profile/settings-row';
+import { useProfileStore } from '@/stores/profile-store';
 
 export default function ProfileScreen() {
-  const [pushEnabled, setPushEnabled] = useState(false);
+  const pushEnabled = useProfileStore((state) => state.pushEnabled);
+  const setPushEnabled = useProfileStore((state) => state.setPushEnabled);
 
   return (
     <SafeAreaView style={styles.safeArea}>

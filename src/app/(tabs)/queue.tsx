@@ -10,10 +10,12 @@ import LiveQueueCard from '../../components/cards/live-queue-card';
 import InstructionList from '../../components/queue/instruction-list';
 import IconButton from '@/components/ui/header-badge';
 import SectionHeader from '@/components/shared/section-header';
+import { useQueueStore } from '@/stores/queue-store';
 
 export default function QueueScreen() {
-  
+
   const router = useRouter();
+  const ticket = useQueueStore((state) => state.ticket);
 
   const queueRules = [
     { id: '1', text: <Text>Please ensure you are within the hospital premises at least <Text style={styles.boldText}>15 minutes</Text> before your turn.</Text> },
@@ -49,15 +51,15 @@ export default function QueueScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
         {/* 1. YOUR UNIFIED QUEUE CARD (Queue Variant) */}
-        <LiveQueueCard 
+        <LiveQueueCard
           variant="queue"
-          hospitalName="KNUST University Hospital"
-          department="General OPD"
-          doctorName="Dr. Arhin"
-          currentNumber={4}
-          userNumber={12}
-          waitTimeMins={45}
-          roomNumber="302"
+          hospitalName={ticket.hospitalName}
+          department={ticket.department}
+          doctorName={ticket.doctorName}
+          currentNumber={ticket.currentNumber}
+          userNumber={ticket.userNumber}
+          waitTimeMins={ticket.waitTimeMins}
+          roomNumber={ticket.roomNumber}
           onArrived={handleArrived}
           onCancel={handleCancel}
           onQRPress={() => Alert.alert("QR Code", "Displaying full screen QR...")}

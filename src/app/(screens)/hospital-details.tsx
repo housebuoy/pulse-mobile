@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ImageBackground,
   Dimensions,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +18,8 @@ import MonthSelector from '@/components/book-appointment/month-selector';
 import TimeSlotPicker, { TimeSlot } from '@/components/book-appointment/time-slot-picker';
 import Divider from '@/components/ui/divider';
 import Dropdown, { DropdownOption } from '@/components/ui/dropdown-menu';
+import { fetchMockAvailability, HospitalAvailability } from '@/services/mock/hospital-schedule';
+import { useBookingStore } from '@/stores/booking-store';
 
 // const { width, height } = Dimensions.get('window');
 const HEADER_HEIGHT = 280; // Total height of the image area
@@ -24,6 +27,7 @@ const HEADER_HEIGHT = 280; // Total height of the image area
 const { width } = Dimensions.get('window');
 
 // --- Mock Data ---
+const HOSPITAL_ID = 'knust-university-hospital';
 const HOSPITAL = {
   name: 'KNUST University Hospital',
   location: 'University Road, Kumasi',
@@ -44,30 +48,51 @@ const DEPARTMENTS: DropdownOption[] = [
   { label: 'Pediatrics', value: 'pediatrics' },
 ];
 
-const slots: TimeSlot[] = [
-  { time: '10:30 AM', available: true },
-  { time: '8:15 AM', available: true }, // will appear before 10:30
-  { time: '11:15 AM', available: true },
-  { time: '2:15 PM', available: true },
-  { time: '5:00 PM', available: false },
-  { time: '3:00 PM', available: true },
-];
-
-const HARDCODED_AVAILABILITY = {
-  closedDates: [],
-  fullDates: [],
-};
+const TODAY_ISO = new Date().toISOString().split('T')[0];
 
 export default function HospitalDetailsScreen() {
   const router = useRouter();
 
-  // --- State ---
-  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
+  // --- Booking selection now lives in the shared booking store, so it
+  // survives navigating away and back (and app reloads). ---
+  const department = useBookingStore((state) => state.department);
+  const selectedDate = useBookingStore((state) => state.selectedDate) ?? TODAY_ISO;
+  const selectedTime = useBookingStore((state) => state.selectedTime);
+  const setFacility = useBookingStore((state) => state.setFacility);
+  const setDepartment = useBookingStore((state) => state.setDepartment);
+  const setSelectedDate = useBookingStore((state) => state.setSelectedDate);
+  const setSelectedTime = useBookingStore((state) => state.setSelectedTime);
+
+  useEffect(() => {
+    setFacility(HOSPITAL.name, HOSPITAL.location);
+  }, [setFacility]);
+
+  // --- Calendar cursor (which month is displayed) stays local UI state ---
   const [currentMonth, setCurrentMonth] = useState(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+
+  // --- Availability now comes from the shared mock service instead of a
+  // hardcoded literal, so this screen and Reschedule read the same source. ---
+  const [availability, setAvailability] = useState<HospitalAvailability | null>(null);
+  const [loadingAvailability, setLoadingAvailability] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingAvailability(true);
+    fetchMockAvailability(HOSPITAL_ID, currentMonth).then((data) => {
+      if (!cancelled) {
+        setAvailability(data);
+        setLoadingAvailability(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentMonth]);
+
+  const daySlots = availability?.slots[selectedDate];
+  const flatSlots: TimeSlot[] = daySlots ? [...daySlots.MORNING, ...daySlots.AFTERNOON] : [];
 
   // --- Animation Value ---
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -169,8 +194,8 @@ export default function HospitalDetailsScreen() {
           <Dropdown
             label="Department"
             options={DEPARTMENTS}
-            selected={selectedDepartment}
-            onSelect={setSelectedDepartment}
+            selected={department}
+            onSelect={setDepartment}
             placeholder="Select a department"
           />
 
@@ -191,8 +216,8 @@ export default function HospitalDetailsScreen() {
             // currentMonth={currentMonth}
             selectedDate={selectedDate}
             onDateSelect={setSelectedDate}
-            disabledDates={HARDCODED_AVAILABILITY?.closedDates} // hospital closed days
-            unavailableDates={HARDCODED_AVAILABILITY?.fullDates} // all slots taken
+            disabledDates={availability?.closedDates ?? []} // hospital closed days
+            unavailableDates={availability?.fullDates ?? []} // all slots taken
           />
 
           {/* 5. Time Slots */}
@@ -200,11 +225,17 @@ export default function HospitalDetailsScreen() {
             Available Slots
           </Text>
 
-          <TimeSlotPicker
-            slots={slots}
-            selectedTime={selectedTime}
-            onSelectTime={setSelectedTime}
-          />
+          {loadingAvailability ? (
+            <View style={styles.loadingSlots}>
+              <ActivityIndicator color={COLORS.primary} />
+            </View>
+          ) : (
+            <TimeSlotPicker
+              slots={flatSlots}
+              selectedTime={selectedTime}
+              onSelectTime={setSelectedTime}
+            />
+          )}
         </View>
       </Animated.ScrollView>
 
@@ -418,6 +449,7 @@ const styles = StyleSheet.create({
   },
 
   // Time Slots (Reused logic)
+  loadingSlots: { paddingVertical: 40, alignItems: 'center' },
   timeGroup: { marginBottom: 20 },
   periodLabel: {
     fontSize: 12,

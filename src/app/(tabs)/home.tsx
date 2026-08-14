@@ -11,9 +11,11 @@ import QuickActionIcon from '../../components/cards/quick-action';
 import VisitHistoryCard from '../../components/cards/visit-history';
 import HealthTipBanner from '../../components/cards/health-tip-banner';
 import IconButton from '@/components/ui/header-badge';
+import { useQueueStore } from '@/stores/queue-store';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const ticket = useQueueStore((state) => state.ticket);
   // Dynamic greeting based on time of day
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
@@ -37,13 +39,13 @@ export default function HomeScreen() {
         {/* --- 1. LIVE QUEUE HERO CARD --- */}
         <LiveQueueCard
           variant="home"
-          hospitalName="KNUST University Hospital"
-          department="General OPD"
-          doctorName="Dr. Arhin"
-          waitTimeMins={45}
-          currentNumber={4}
-          userNumber={12}
-          estimatedTime="10:15 AM"
+          hospitalName={ticket.hospitalName}
+          department={ticket.department}
+          doctorName={ticket.doctorName}
+          waitTimeMins={ticket.waitTimeMins}
+          currentNumber={ticket.currentNumber}
+          userNumber={ticket.userNumber}
+          estimatedTime={ticket.estimatedTime}
           // onViewDetails={() => router.push('/(tabs)/queue')}
         />
 

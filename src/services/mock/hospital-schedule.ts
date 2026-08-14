@@ -1,14 +1,33 @@
-import { format, addDays, isWeekend } from 'date-fns';
+import { format, addDays } from 'date-fns';
+
+export interface MockTimeSlot {
+  time: string;
+  available: boolean;
+}
+
+export interface DaySlots {
+  MORNING: MockTimeSlot[];
+  AFTERNOON: MockTimeSlot[];
+}
+
+export interface HospitalAvailability {
+  closedDates: string[];
+  fullDates: string[];
+  slots: Record<string, DaySlots>;
+}
 
 // A fake database function to simulate an API call
-export const fetchMockAvailability = async (hospitalId: string, currentMonth: Date) => {
-  
+export const fetchMockAvailability = async (
+  hospitalId: string,
+  currentMonth: Date
+): Promise<HospitalAvailability> => {
+
   // 1. Simulate a 800ms network delay so we can see our loading spinners
   await new Promise(resolve => setTimeout(resolve, 800));
 
   const closedDates: string[] = [];
   const fullDates: string[] = [];
-  const slotsByDate: Record<string, any> = {};
+  const slotsByDate: Record<string, DaySlots> = {};
 
   // 2. Generate 30 days of fake data for the current month
   for (let i = 0; i < 30; i++) {
