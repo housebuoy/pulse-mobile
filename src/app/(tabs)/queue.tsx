@@ -13,23 +13,45 @@ import SectionHeader from '@/components/shared/section-header';
 import { useQueueStore } from '@/stores/queue-store';
 
 export default function QueueScreen() {
-
   const router = useRouter();
   const ticket = useQueueStore((state) => state.ticket);
 
   const queueRules = [
-    { id: '1', text: <Text>Please ensure you are within the hospital premises at least <Text style={styles.boldText}>15 minutes</Text> before your turn.</Text> },
-    { id: '2', text: <Text>If you miss your call, you will be shifted back <Text style={styles.boldText}>3 spaces</Text> in the queue automatically.</Text> },
-    { id: '3', text: <Text>Keep your ticket QR code ready for scanning at the reception desk.</Text> },
+    {
+      id: '1',
+      text: (
+        <Text>
+          Please ensure you are within the hospital premises at least{' '}
+          <Text style={styles.boldText}>15 minutes</Text> before your turn.
+        </Text>
+      ),
+    },
+    {
+      id: '2',
+      text: (
+        <Text>
+          If you miss your call, you will be shifted back{' '}
+          <Text style={styles.boldText}>3 spaces</Text> in the queue automatically.
+        </Text>
+      ),
+    },
+    {
+      id: '3',
+      text: <Text>Keep your ticket QR code ready for scanning at the reception desk.</Text>,
+    },
   ];
 
   // Placeholder actions
-  const handleArrived = () => Alert.alert("Location Verified", "You are now marked as present in the waiting room.");
-  const handleCancel = () => Alert.alert("Cancel Ticket", "Are you sure you want to cancel your queue ticket?", [{text: "No"}, {text: "Yes, Cancel", style: "destructive"}]);
+  const handleArrived = () =>
+    Alert.alert('Location Verified', 'You are now marked as present in the waiting room.');
+  const handleCancel = () =>
+    Alert.alert('Cancel Ticket', 'Are you sure you want to cancel your queue ticket?', [
+      { text: 'No' },
+      { text: 'Yes, Cancel', style: 'destructive' },
+    ]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      
       {/* --- CUSTOM HEADER --- */}
       <View style={styles.header}>
         <View>
@@ -39,7 +61,7 @@ export default function QueueScreen() {
             <Text style={styles.statusText}>Last updated: Just now</Text>
           </View>
         </View>
-        
+
         <IconButton
           icon="notifications-outline"
           badge={true}
@@ -49,7 +71,6 @@ export default function QueueScreen() {
 
       {/* --- MAIN CONTENT --- */}
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
         {/* 1. YOUR UNIFIED QUEUE CARD (Queue Variant) */}
         <LiveQueueCard
           variant="queue"
@@ -62,41 +83,40 @@ export default function QueueScreen() {
           roomNumber={ticket.roomNumber}
           onArrived={handleArrived}
           onCancel={handleCancel}
-          onQRPress={() => Alert.alert("QR Code", "Displaying full screen QR...")}
+          onQRPress={() => Alert.alert('QR Code', 'Displaying full screen QR...')}
         />
 
         {/* 2. RELATED FUNCTIONS (Reschedule, Directions, etc.) */}
         <SectionHeader title="Manage Appointment" iconName="options-outline" />
         <View style={styles.relatedFunctionsRow}>
-          
-          <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(screens)/reschedule')} activeOpacity={0.7}>
-            <View style={[styles.iconCircle, { backgroundColor: '#EFF6FF' }]}>
-              <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
-            </View>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => router.push('/(screens)/reschedule')}
+            activeOpacity={0.7}>
+            <Ionicons
+              name="calendar-outline"
+              size={24}
+              color={COLORS.primary}
+              style={styles.actionIcon}
+            />
             <Text style={styles.actionText}>Reschedule</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-            <View style={[styles.iconCircle, { backgroundColor: '#F3E8FF' }]}>
-              <Ionicons name="map-outline" size={22} color="#9333EA" />
-            </View>
+            <Ionicons name="map-outline" size={24} color="#9333EA" style={styles.actionIcon} />
             <Text style={styles.actionText}>Directions</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-            <View style={[styles.iconCircle, { backgroundColor: '#ECFEFF' }]}>
-              <Ionicons name="call-outline" size={22} color="#0891B2" />
-            </View>
+            <Ionicons name="call-outline" size={24} color="#0891B2" style={styles.actionIcon} />
             <Text style={styles.actionText}>Desk</Text>
           </TouchableOpacity>
-
         </View>
 
         {/* 3. IMPORTANT INSTRUCTIONS */}
         <View style={styles.instructionsWrapper}>
-           <InstructionList rules={queueRules} />
+          <InstructionList rules={queueRules} />
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -116,10 +136,9 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   headerTitle: {
-    fontSize: 32,
-    fontWeight: '900',
+    fontSize: 28,
+    fontWeight: '700',
     color: '#111827',
-    marginBottom: 4,
   },
   statusRow: {
     flexDirection: 'row',
@@ -156,7 +175,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 100,
   },
-  
+  actionIcon: {
+    marginBottom: 6, 
+  },
+
   // --- RELATED FUNCTIONS STYLES ---
   sectionTitle: {
     fontSize: 16,
@@ -188,7 +210,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#4B5563',
   },
-  
+
   // --- INSTRUCTIONS ---
   instructionsWrapper: {
     marginTop: 8,
@@ -196,5 +218,5 @@ const styles = StyleSheet.create({
   boldText: {
     fontWeight: '700',
     color: '#111827',
-  }
+  },
 });

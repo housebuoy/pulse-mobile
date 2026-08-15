@@ -21,7 +21,7 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
         <TouchableOpacity style={styles.headerIcon}>
-          <Ionicons name="settings-outline" size={24} color={COLORS.primary} />
+          <Ionicons name="settings-outline" size={24}  />
         </TouchableOpacity>
       </View>
 
@@ -31,11 +31,11 @@ export default function ProfileScreen() {
 
         <SettingsCard title="Health & Family">
           <SettingsRow 
-            iconName="medkit-outline" iconBgColor="#FEE2E2" iconColor="#DC2626"
+            iconName="medkit-outline" iconBgColor="#DBEAFE" iconColor="#2563EB"
             title="Medical ID & Vitals" subtitle="Blood group, allergies"
           />
           <SettingsRow 
-            iconName="people-outline" iconBgColor="#FFEDD5" iconColor="#EA580C"
+            iconName="people-outline" iconBgColor="#DBEAFE" iconColor="#2563EB"
             title="Family & Dependents" rightLabel="2 Linked" rightLabelColor="#6B7280"
           />
           <SettingsRow 
@@ -43,7 +43,7 @@ export default function ProfileScreen() {
             title="Health Insurance" subtitle="(NHIS)" rightLabel="Active - Ends Dec 2026" rightLabelColor="#10B981"
           />
           <SettingsRow 
-            iconName="wallet-outline" iconBgColor="#F3E8FF" iconColor="#9333EA"
+            iconName="wallet-outline" iconBgColor="#DBEAFE" iconColor="#2563EB"
             title="Payment Methods & Wallet" rightLabel="GHS 450.00" rightLabelColor="#111827"
             isLast={true}
           />
@@ -51,16 +51,16 @@ export default function ProfileScreen() {
 
         <SettingsCard title="App Settings">
           <SettingsRow 
-            iconName="notifications-outline" iconBgColor="#FEE2E2" iconColor="#DC2626"
+            iconName="notifications-outline" iconBgColor="#DBEAFE" iconColor="#2563EB"
             title="Push Notifications"
             isSwitch={true} switchValue={pushEnabled} onSwitchChange={setPushEnabled}
           />
           <SettingsRow 
-            iconName="lock-closed-outline" iconBgColor="#F3F4F6" iconColor="#4B5563"
+            iconName="lock-closed-outline" iconBgColor="#DBEAFE" iconColor="#2563EB"
             title="Security & PIN"
           />
           <SettingsRow 
-            iconName="globe-outline" iconBgColor="#E0E7FF" iconColor="#4F46E5"
+            iconName="globe-outline" iconBgColor="#DBEAFE" iconColor="#2563EB"
             title="Language" rightLabel="English"
             isLast={true}
           />
@@ -68,7 +68,7 @@ export default function ProfileScreen() {
 
         <SettingsCard title="Support & Exit">
           <SettingsRow 
-            iconName="help-circle-outline" iconBgColor="#D1FAE5" iconColor="#059669"
+            iconName="help-circle-outline" iconBgColor="#DBEAFE" iconColor="#2563EB"
             title="Help & Support"
           />
           <SettingsRow 
@@ -99,8 +99,8 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   headerTitle: {
-    fontSize: 32,
-    fontWeight: '900',
+    fontSize: 28,
+    fontWeight: '700',
     color: '#111827',
   },
   headerIcon: {

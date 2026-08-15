@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, Easing, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import '../../global.css';
+// import '../../global.css'; // Ensure Tailwind CSS is applied
 import { useRouter } from 'expo-router';
 // import { Ionicons } from '@expo/vector-icons'; // For the temporary logo icon
 

@@ -85,7 +85,11 @@ export default function RecordsScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16 },
-  headerTitle: { fontSize: 32, fontWeight: '900', color: '#111827' },
+    headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#111827',
+  },
   searchContainer: { paddingHorizontal: 20, paddingBottom: 8, backgroundColor: '#FFFFFF' },
   scrollContent: { paddingBottom: 100 },
   bannerWrapper: { paddingHorizontal: 20, paddingBottom: 12 },

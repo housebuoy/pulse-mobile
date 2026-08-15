@@ -39,9 +39,9 @@ export default function BookAppointmentScreen() {
     <SafeAreaView style={styles.safeArea}>
       {/* 1. HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerSideBtn}>
+        {/* <TouchableOpacity onPress={() => router.back()} style={styles.headerSideBtn}>
           <Ionicons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
         <Text style={styles.headerTitle}>Book Appointment</Text>
         <Animated.View style={[styles.headerSideBtn, { opacity: sosOpacity, alignItems: 'flex-end' }]}>
           <TouchableOpacity style={styles.sosButton} onPress={() => router.push('/emergency-triage')}>
@@ -107,7 +107,11 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#FFFFFF' },
   headerSideBtn: { width: 70, justifyContent: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
+    headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#111827',
+  },
   sosButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, gap: 4 },
   sosText: { color: '#DC2626', fontWeight: '800', fontSize: 12 },
   searchContainer: { paddingHorizontal: 20, paddingBottom: 8, backgroundColor: '#FFFFFF' },

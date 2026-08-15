@@ -1,21 +1,36 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 
-// Import our Lego Blocks! (Adjust paths based on exactly where you saved them)
+// Import our Lego Blocks!
 import LiveQueueCard from '../../components/cards/live-queue-card';
 import SectionHeader from '../../components/shared/section-header';
-import QuickActionIcon from '../../components/cards/quick-action';
 import VisitHistoryCard from '../../components/cards/visit-history';
 import HealthTipBanner from '../../components/cards/health-tip-banner';
+import DiscoveryCard from '@/components/cards/discovery-card';
+import UpcomingAppointmentCard from '@/components/cards/upcoming-card';
 import IconButton from '@/components/ui/header-badge';
 import { useQueueStore } from '@/stores/queue-store';
 
 export default function HomeScreen() {
   const router = useRouter();
   const ticket = useQueueStore((state) => state.ticket);
+  
+  // Toggle this state ('live' | 'upcoming' | 'empty') to test your different layouts
+  const [patientStatus, setPatientStatus] = useState<'live' | 'upcoming' | 'empty'>('live');
+
+  // Dummy upcoming appointment data
+  const appointment = {
+    hospitalName: 'KNUST University Hospital',
+    department: 'General OPD',
+    doctorName: 'Dr. Arhin',
+    date: 'Oct 28, 2026',
+    time: '09:00 AM'
+  };
+
   // Dynamic greeting based on time of day
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
@@ -36,50 +51,54 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* --- 1. LIVE QUEUE HERO CARD --- */}
-        <LiveQueueCard
-          variant="home"
-          hospitalName={ticket.hospitalName}
-          department={ticket.department}
-          doctorName={ticket.doctorName}
-          waitTimeMins={ticket.waitTimeMins}
-          currentNumber={ticket.currentNumber}
-          userNumber={ticket.userNumber}
-          estimatedTime={ticket.estimatedTime}
-          // onViewDetails={() => router.push('/(tabs)/queue')}
-        />
+        
+        {/* --- 1. THE HERO SECTION (Conditionally Rendered) --- */}
+        <View style={styles.heroSection}>
+          {patientStatus === 'live' && (
+            <LiveQueueCard
+              variant="home"
+              hospitalName={ticket.hospitalName}
+              department={ticket.department}
+              doctorName={ticket.doctorName}
+              waitTimeMins={ticket.waitTimeMins}
+              currentNumber={ticket.currentNumber}
+              userNumber={ticket.userNumber}
+              estimatedTime={ticket.estimatedTime}
+              // onViewDetails={() => router.push('/(tabs)/queue')}
+            />
+          )}
 
-        {/* --- 2. QUICK ACTIONS (Horizontal Row) --- */}
-        <SectionHeader title="Quick Actions" iconName="grid-outline" />
-        <View style={styles.quickActionsRow}>
-          <QuickActionIcon
-            iconName="calendar-outline"
-            label="Book Slot"
-            backgroundColor={COLORS.primaryLight}
-            iconColor={COLORS.primary}
-            onPress={() => router.replace('/(tabs)/book-appointment')}
-          />
-          <QuickActionIcon
-            iconName="folder-outline"
-            label="My Folder"
-            backgroundColor="#F3E8FF"
-            iconColor="#9333EA"
-            onPress={() => {}}
-          />
-          <QuickActionIcon
-            iconName="flask-outline"
-            label="Lab Results"
-            backgroundColor="#DCFCE7"
-            iconColor="#16A34A"
-            onPress={() => {}}
-          />
-          <QuickActionIcon
-            iconName="wallet-outline"
-            label="Wallets"
-            backgroundColor="#FFEDD5"
-            iconColor="#EA580C"
-            onPress={() => {}}
-          />
+          {patientStatus === 'upcoming' && (
+            <UpcomingAppointmentCard {...appointment} />
+          )}
+
+          {patientStatus === 'empty' && (
+            <DiscoveryCard onBook={() => router.push('/(tabs)/book-appointment')} />
+          )}
+        </View>
+
+        {/* --- 2. QUICK ACTION PILLS (Horizontal Row) --- */}
+        <View style={styles.sectionSpacing}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.pillContainer}
+          >
+            <TouchableOpacity style={styles.actionPill}>
+              <Ionicons name="flask-outline" size={16} color={COLORS.primary} />
+              <Text style={styles.actionPillText}>Lab Results</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionPill}>
+              <Ionicons name="medical-outline" size={16} color={COLORS.primary} />
+              <Text style={styles.actionPillText}>Prescriptions</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionPill}>
+              <Ionicons name="card-outline" size={16} color={COLORS.primary} />
+              <Text style={styles.actionPillText}>Pay Bill</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
 
         {/* --- 3. RECENT VISITS --- */}
@@ -101,7 +120,7 @@ export default function HomeScreen() {
               room="Room 302"
               iconName="pulse"
               iconColor={COLORS.primary}
-              iconBgColor={COLORS.primaryLight}
+              iconBgColor="#EFF6FF"
             />
             <VisitHistoryCard
               date="Sep 12"
@@ -130,7 +149,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAFAFA', // Slightly off-white background to make cards pop
+    backgroundColor: '#FAFAFA',
   },
   headerRow: {
     flexDirection: 'row',
@@ -148,39 +167,50 @@ const styles = StyleSheet.create({
   },
   nameText: {
     fontSize: 28,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#111827',
-  },
-  bellIcon: {
-    backgroundColor: '#F3F4F6',
-    padding: 12,
-    borderRadius: 999,
-    position: 'relative',
-  },
-  redDot: {
-    position: 'absolute',
-    top: 10,
-    right: 12,
-    width: 8,
-    height: 8,
-    backgroundColor: '#EF4444',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingBottom: 20, // Extra padding so the bottom tab bar doesn't cover the last card
+    paddingBottom: 20,
   },
-  quickActionsRow: {
+  heroSection: {
+    // Ensures spacing below the hero card regardless of which one renders
+    marginBottom: 20,
+  },
+  
+  // --- New Pill Styles ---
+  pillContainer: {
+    gap: 12, // Requires RN 0.71+, adds space between horizontal items
+    paddingRight: 24, // Ensures the last pill doesn't cut off at the edge of the screen
+  },
+  actionPill: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 32,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
+  actionPillText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+
   sectionSpacing: {
     marginBottom: 32,
   },
   horizontalScroll: {
-    overflow: 'visible', // Allows shadows on the cards to not get clipped
+    overflow: 'visible',
+    gap: 16,
   },
 });
