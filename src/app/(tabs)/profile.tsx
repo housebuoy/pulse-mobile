@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/theme';
 
 // Import our new Lego Blocks
@@ -11,6 +12,7 @@ import SettingsRow from '../../components/profile/settings-row';
 import { useProfileStore } from '@/stores/profile-store';
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const pushEnabled = useProfileStore((state) => state.pushEnabled);
   const setPushEnabled = useProfileStore((state) => state.setPushEnabled);
 
@@ -21,7 +23,7 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
         <TouchableOpacity style={styles.headerIcon}>
-          <Ionicons name="settings-outline" size={24}  />
+          <Ionicons name="settings-outline" size={24} color="#111827" />
         </TouchableOpacity>
       </View>
 
@@ -30,21 +32,24 @@ export default function ProfileScreen() {
         <ProfileHeader />
 
         <SettingsCard title="Health & Family">
-          <SettingsRow 
+          <SettingsRow
             iconName="medkit-outline" iconBgColor="#DBEAFE" iconColor="#2563EB"
-            title="Medical ID & Vitals" subtitle="Blood group, allergies"
+            title="Medical ID & Vitals"
+            onPress={() => router.push('/(screens)/medical-id')}
           />
           <SettingsRow 
             iconName="people-outline" iconBgColor="#DBEAFE" iconColor="#2563EB"
-            title="Family & Dependents" rightLabel="2 Linked" rightLabelColor="#6B7280"
+            title="Family & Dependents" 
           />
-          <SettingsRow 
+          <SettingsRow
             iconName="shield-checkmark-outline" iconBgColor="#DBEAFE" iconColor="#2563EB"
-            title="Health Insurance" subtitle="(NHIS)" rightLabel="Active - Ends Dec 2026" rightLabelColor="#10B981"
+            title="Health Insurance"
+            onPress={() => router.push('/(screens)/health-insurance')}
           />
-          <SettingsRow 
+          <SettingsRow
             iconName="wallet-outline" iconBgColor="#DBEAFE" iconColor="#2563EB"
-            title="Payment Methods & Wallet" rightLabel="GHS 450.00" rightLabelColor="#111827"
+            title="Wallet & Payments"
+            onPress={() => router.push('/(screens)/payments')}
             isLast={true}
           />
         </SettingsCard>
@@ -61,7 +66,7 @@ export default function ProfileScreen() {
           />
           <SettingsRow 
             iconName="globe-outline" iconBgColor="#DBEAFE" iconColor="#2563EB"
-            title="Language" rightLabel="English"
+            title="Language" 
             isLast={true}
           />
         </SettingsCard>

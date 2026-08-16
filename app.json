@@ -11,7 +11,13 @@
       "tsconfigPaths": true
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Pulse uses your photo library to attach a picture of your insurance card."
+        }
+      ]
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
