@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { format, parseISO } from 'date-fns';
 import { COLORS } from '@/constants/theme';
 import SearchBar from '../../components/ui/search-bar';
 import MedicalIdBanner from '../../components/records/medical-banner';
@@ -12,10 +13,19 @@ import PrescriptionCard from '../../components/records/prescription-card';
 import VisitDetailSheet from '../../components/records/visit-detail-sheet';
 import LabResultDetailSheet from '../../components/records/lab-result-detail-sheet';
 import PrescriptionDetailSheet from '../../components/records/prescription-detail-sheet';
+import RecordsFilterSheet from '../../components/records/records-filter-sheet';
 import IconButton from '@/components/ui/header-badge';
 import Divider from '@/components/ui/divider';
 import { LabResult, Prescription, Visit, useRecordsStore } from '@/stores/records-store';
 import { withRecencyDivider } from '@/utils/group-by-recency';
+import {
+  DEFAULT_RECORDS_FILTER,
+  RecordsFilterState,
+  isFilterActive,
+  isWithinDatePreset,
+  matchesQuery,
+  uniqueSorted,
+} from '@/utils/records-filter';
 
 const BANNER_HEIGHT = 90;
 
@@ -34,6 +44,88 @@ export default function RecordsScreen() {
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [selectedLabResult, setSelectedLabResult] = useState<LabResult | null>(null);
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<RecordsFilterState>(DEFAULT_RECORDS_FILTER);
+  const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+
+  // Structured filters are tab-specific (a "Cardiology" pick doesn't mean
+  // anything on the Prescriptions tab), so switching tabs resets them. The
+  // search text carries over — a typed query still makes sense elsewhere.
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab as TabKey);
+    setFilter(DEFAULT_RECORDS_FILTER);
+  };
+
+  const filteredVisits = useMemo(() => {
+    return visits.filter((v) => {
+      if (!isWithinDatePreset(v.date, filter.datePreset)) return false;
+      if (filter.hospital && v.hospital !== filter.hospital) return false;
+      if (filter.doctor && v.doctor !== filter.doctor) return false;
+      if (filter.type && v.department !== filter.type) return false;
+      return matchesQuery(
+        [v.department, v.hospital, v.doctor, format(parseISO(v.date), 'MMM d, yyyy')],
+        searchQuery
+      );
+    });
+  }, [visits, filter, searchQuery]);
+
+  const filteredLabResults = useMemo(() => {
+    return labResults.filter((l) => {
+      if (!isWithinDatePreset(l.date, filter.datePreset)) return false;
+      if (filter.hospital && l.hospital !== filter.hospital) return false;
+      if (filter.doctor && l.orderingDoctor !== filter.doctor) return false;
+      if (filter.type && l.testName !== filter.type) return false;
+      return matchesQuery(
+        [l.testName, l.hospital, l.orderingDoctor, format(parseISO(l.date), 'MMM d, yyyy')],
+        searchQuery
+      );
+    });
+  }, [labResults, filter, searchQuery]);
+
+  const filteredPrescriptions = useMemo(() => {
+    return prescriptions.filter((p) => {
+      if (!isWithinDatePreset(p.date, filter.datePreset)) return false;
+      if (filter.hospital && p.hospital !== filter.hospital) return false;
+      if (filter.doctor && p.prescribingDoctor !== filter.doctor) return false;
+      if (filter.type && p.medication !== filter.type) return false;
+      return matchesQuery(
+        [p.medication, p.hospital, p.prescribingDoctor, format(parseISO(p.date), 'MMM d, yyyy')],
+        searchQuery
+      );
+    });
+  }, [prescriptions, filter, searchQuery]);
+
+  const hospitalOptions = useMemo(() => {
+    const source =
+      activeTab === 'Visits'
+        ? visits.map((v) => v.hospital)
+        : activeTab === 'Lab Results'
+          ? labResults.map((l) => l.hospital)
+          : prescriptions.map((p) => p.hospital);
+    return uniqueSorted(source);
+  }, [activeTab, visits, labResults, prescriptions]);
+
+  const doctorOptions = useMemo(() => {
+    const source =
+      activeTab === 'Visits'
+        ? visits.map((v) => v.doctor)
+        : activeTab === 'Lab Results'
+          ? labResults.map((l) => l.orderingDoctor)
+          : prescriptions.map((p) => p.prescribingDoctor);
+    return uniqueSorted(source);
+  }, [activeTab, visits, labResults, prescriptions]);
+
+  const typeLabel = activeTab === 'Visits' ? 'Department' : activeTab === 'Lab Results' ? 'Test' : 'Medication';
+  const typeOptions = useMemo(() => {
+    const source =
+      activeTab === 'Visits'
+        ? visits.map((v) => v.department)
+        : activeTab === 'Lab Results'
+          ? labResults.map((l) => l.testName)
+          : prescriptions.map((p) => p.medication);
+    return uniqueSorted(source);
+  }, [activeTab, visits, labResults, prescriptions]);
 
   const bannerOpacity = scrollY.interpolate({
     inputRange: [0, BANNER_HEIGHT * 0.6],
@@ -64,7 +156,13 @@ export default function RecordsScreen() {
 
       {/* 2. SEARCH BAR — pinned */}
       <View style={styles.searchContainer}>
-        <SearchBar placeholder={searchPlaceholder} />
+        <SearchBar
+          placeholder={searchPlaceholder}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onFilterPress={() => setFilterSheetVisible(true)}
+          filterActive={isFilterActive(filter)}
+        />
       </View>
 
       {/* 3. SCROLL */}
@@ -90,20 +188,18 @@ export default function RecordsScreen() {
             outputRange: ['rgba(229,231,235,0)', 'rgba(229,231,235,1)'],
           }),
         }]}>
-          <RecordsTabs
-            tabs={TABS}
-            activeTab={activeTab}
-            onTabChange={(tab) => setActiveTab(tab as TabKey)}
-          />
+          <RecordsTabs tabs={TABS} activeTab={activeTab} onTabChange={handleTabChange} />
         </Animated.View>
 
         {/* CHILD 2 — records */}
         <View style={styles.cardsWrapper}>
           {activeTab === 'Visits' &&
-            (visits.length === 0 ? (
-              <Text style={styles.emptyText}>No visits recorded</Text>
+            (filteredVisits.length === 0 ? (
+              <Text style={styles.emptyText}>
+                {visits.length === 0 ? 'No visits recorded' : 'No visits match your search or filters'}
+              </Text>
             ) : (
-              withRecencyDivider(visits, (v) => v.date).map((row, index) =>
+              withRecencyDivider(filteredVisits, (v) => v.date).map((row, index) =>
                 row.type === 'divider' ? (
                   <Divider key={`divider-${index}`} label={row.label} thickness={2} />
                 ) : (
@@ -121,10 +217,14 @@ export default function RecordsScreen() {
             ))}
 
           {activeTab === 'Lab Results' &&
-            (labResults.length === 0 ? (
-              <Text style={styles.emptyText}>No lab results recorded</Text>
+            (filteredLabResults.length === 0 ? (
+              <Text style={styles.emptyText}>
+                {labResults.length === 0
+                  ? 'No lab results recorded'
+                  : 'No lab results match your search or filters'}
+              </Text>
             ) : (
-              withRecencyDivider(labResults, (l) => l.date).map((row, index) =>
+              withRecencyDivider(filteredLabResults, (l) => l.date).map((row, index) =>
                 row.type === 'divider' ? (
                   <Divider key={`divider-${index}`} label={row.label} thickness={2} />
                 ) : (
@@ -138,10 +238,14 @@ export default function RecordsScreen() {
             ))}
 
           {activeTab === 'Prescriptions' &&
-            (prescriptions.length === 0 ? (
-              <Text style={styles.emptyText}>No prescriptions recorded</Text>
+            (filteredPrescriptions.length === 0 ? (
+              <Text style={styles.emptyText}>
+                {prescriptions.length === 0
+                  ? 'No prescriptions recorded'
+                  : 'No prescriptions match your search or filters'}
+              </Text>
             ) : (
-              withRecencyDivider(prescriptions, (p) => p.date).map((row, index) =>
+              withRecencyDivider(filteredPrescriptions, (p) => p.date).map((row, index) =>
                 row.type === 'divider' ? (
                   <Divider key={`divider-${index}`} label={row.label} thickness={2} />
                 ) : (
@@ -161,6 +265,16 @@ export default function RecordsScreen() {
       <PrescriptionDetailSheet
         prescription={selectedPrescription}
         onClose={() => setSelectedPrescription(null)}
+      />
+      <RecordsFilterSheet
+        visible={filterSheetVisible}
+        onClose={() => setFilterSheetVisible(false)}
+        filter={filter}
+        onApply={setFilter}
+        hospitalOptions={hospitalOptions}
+        doctorOptions={doctorOptions}
+        typeLabel={typeLabel}
+        typeOptions={typeOptions}
       />
     </SafeAreaView>
   );
