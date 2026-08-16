@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/theme';
 import SearchBar from '../../components/ui/search-bar';
 import MedicalIdBanner from '../../components/records/medical-banner';
@@ -12,6 +13,7 @@ import Divider from '@/components/ui/divider';
 const BANNER_HEIGHT = 90;
 
 export default function RecordsScreen() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('Visits');
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -53,7 +55,7 @@ export default function RecordsScreen() {
 
         {/* CHILD 0 — banner fades out */}
         <Animated.View style={[styles.bannerWrapper, { opacity: bannerOpacity }]}>
-          <MedicalIdBanner onPress={() => {}} />
+          <MedicalIdBanner onPress={() => router.push('/(screens)/medical-id')} />
         </Animated.View>
 
         {/* CHILD 1 — tabs stick */}

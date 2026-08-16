@@ -3,8 +3,24 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { COLORS } from '@/constants/theme';
+import { useMedicalStore } from '@/stores/medical-store';
 
+// Reads straight from the same medical-store the Medical ID & Vitals screen
+// writes to — one data source, this banner is just a live-updating preview
+// of it, not a second copy.
 export default function MedicalIdBanner({ onPress }: { onPress?: () => void }) {
+  const bloodGroup = useMedicalStore((state) => state.bloodGroup);
+  const allergies = useMedicalStore((state) => state.allergies);
+
+  const subtitle = (() => {
+    const parts: string[] = [];
+    parts.push(bloodGroup ? `Blood group ${bloodGroup}` : 'Blood group not set');
+    parts.push(
+      allergies.length ? `${allergies.length} ${allergies.length === 1 ? 'allergy' : 'allergies'} noted` : 'No allergies noted'
+    );
+    return parts.join(' · ');
+  })();
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.iconContainer}>
@@ -12,7 +28,7 @@ export default function MedicalIdBanner({ onPress }: { onPress?: () => void }) {
       </View>
       <View style={styles.textContainer}>
         <Text style={styles.title}>My Medical ID</Text>
-        <Text style={styles.subtitle}>Vitals, allergies & blood group</Text>
+        <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
       </View>
       <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
     </TouchableOpacity>
