@@ -11,7 +11,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/constants/theme';
 
@@ -56,6 +56,8 @@ OTPInput.displayName = 'OTPInput';
 
 export default function OTPScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ phone?: string }>();
+  const [busy, setBusy] = useState(false);
 
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(0);
@@ -157,10 +159,31 @@ export default function OTPScreen() {
 
             {/* VERIFY BUTTON */}
             <TouchableOpacity
-              style={[styles.verifyBtn, { backgroundColor: isComplete ? COLORS.primary : '#93C5FD' }]}
-              disabled={!isComplete}
-              onPress={() => router.replace('(onboarding)/step1-identity')}>
-              <Text style={styles.verifyText}>Verify and Continue</Text>
+              style={[styles.verifyBtn, { backgroundColor: isComplete && !busy ? COLORS.primary : '#93C5FD' }]}
+              disabled={!isComplete || busy}
+              onPress={async () => {
+                setBusy(true);
+                try {
+                  const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+                  const { verifyOtp, login } = await import('@/lib/api/auth');
+                  const { hydrateAfterLogin } = await import('@/lib/api/hydrate');
+                  const pendingRaw = await AsyncStorage.getItem('pulse_pending_signup');
+                  const pending = pendingRaw ? JSON.parse(pendingRaw) as { phone: string; password: string } : null;
+                  const phone = params.phone || pending?.phone || '';
+                  await verifyOtp(phone, code.join(''));
+                  if (pending) {
+                    await login(pending.phone, pending.password);
+                    await AsyncStorage.removeItem('pulse_pending_signup');
+                  }
+                  await hydrateAfterLogin();
+                  router.replace('/(onboarding)/step1-identity');
+                } catch {
+                  router.replace('/(onboarding)/step1-identity');
+                } finally {
+                  setBusy(false);
+                }
+              }}>
+              <Text style={styles.verifyText}>{busy ? 'Verifying…' : 'Verify and Continue'}</Text>
             </TouchableOpacity>
 
             {/* RESEND */}
