@@ -52,13 +52,15 @@ export default function InsuranceDetailsCard() {
 
   const handleSave = () => {
     const finalScheme = schemeChoice === 'Other' ? customScheme.trim() || null : schemeChoice;
-    setInsuranceDetails({
+    const details = {
       scheme: finalScheme,
       membershipNumber: membershipInput.trim(),
       cardholderName: cardholderInput.trim(),
       expiryDate: expiryInput.trim() || null,
-    });
+    };
+    setInsuranceDetails(details);
     setModalVisible(false);
+    void import('@/lib/api/patient').then(({ putInsurance }) => putInsurance(details));
   };
 
   return (
