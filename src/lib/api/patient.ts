@@ -1,8 +1,18 @@
 import { isMockMode } from '@/lib/use-mock';
 import { apiRequest } from '@/lib/api/client';
-import type { EmergencyContact, AllergyEntry, ConditionEntry, MedicationEntry, VitalsEntry } from '@/stores/medical-store';
+import type {
+  EmergencyContact,
+  AllergyEntry,
+  ConditionEntry,
+  MedicationEntry,
+  VitalsEntry,
+} from '@/stores/medical-store';
 import type { InsuranceDetails } from '@/stores/insurance-store';
-import type { OutstandingBooking, PaymentMethod, PaymentHistoryEntry } from '@/stores/payments-store';
+import type {
+  OutstandingBooking,
+  PaymentMethod,
+  PaymentHistoryEntry,
+} from '@/stores/payments-store';
 
 export interface PatientProfile {
   id: string;
@@ -47,7 +57,9 @@ export async function getProfile(): Promise<PatientProfile> {
   return apiRequest<PatientProfile>('/patients/me');
 }
 
-export async function patchProfile(body: Partial<PatientProfile> & { emergencyContact?: EmergencyContact }): Promise<PatientProfile> {
+export async function patchProfile(
+  body: Partial<PatientProfile> & { emergencyContact?: EmergencyContact }
+): Promise<PatientProfile> {
   if (isMockMode()) return { ...MOCK_PROFILE, ...body };
   return apiRequest<PatientProfile>('/patients/me', { method: 'PATCH', body });
 }
