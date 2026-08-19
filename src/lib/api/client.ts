@@ -61,7 +61,9 @@ type RequestOptions = {
 /** The only HTTP entry point. All other api/*.ts files call this. */
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, auth = true, headers = {} } = options;
-  const url = path.startsWith('http') ? path : `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+  const url = path.startsWith('http')
+    ? path
+    : `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 
   const h: Record<string, string> = { ...headers };
   if (auth) {
