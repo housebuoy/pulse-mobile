@@ -161,7 +161,8 @@ export const usePaymentsStore = create<PaymentsState>()(
         })),
 
       payBookings: async (bookingIds, methodId) => {
-        const { startCheckout, getOutstanding, getPaymentHistory } = await import('@/lib/api/patient');
+        const { startCheckout, getOutstanding, getPaymentHistory } =
+          await import('@/lib/api/patient');
         const { Linking } = await import('react-native');
         const { checkoutUrl } = await startCheckout(bookingIds, methodId);
         if (checkoutUrl) {
