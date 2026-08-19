@@ -253,7 +253,45 @@ export default function StepThreeFamilyScreen() {
             <TouchableOpacity
               style={[styles.finishBtn, { backgroundColor: isFormValid ? COLORS.primary : '#93C5FD' }]}
               disabled={!isFormValid}
-              onPress={() => router.replace('/(tabs)/home')}>
+              onPress={async () => {
+                const { useMedicalStore } = await import('@/stores/medical-store');
+                const { useInsuranceStore } = await import('@/stores/insurance-store');
+                const { patchProfile, patchMedical, putInsurance } = await import('@/lib/api/patient');
+                const { hydrateAfterLogin } = await import('@/lib/api/hydrate');
+                useMedicalStore.getState().setEmergencyContact({
+                  name: emergencyName.trim(),
+                  relationship: emergencyRel.trim(),
+                  phone: emergencyPhone.trim(),
+                });
+                try {
+                  await patchProfile({
+                    emergencyContact: {
+                      name: emergencyName.trim(),
+                      relationship: emergencyRel.trim(),
+                      phone: emergencyPhone.trim(),
+                    },
+                  });
+                  const med = useMedicalStore.getState();
+                  await patchMedical({
+                    bloodGroup: med.bloodGroup,
+                    allergies: med.allergies,
+                    conditions: med.conditions,
+                    medications: med.medications,
+                  });
+                  const ins = useInsuranceStore.getState();
+                  await putInsurance({
+                    scheme: ins.scheme,
+                    membershipNumber: ins.membershipNumber,
+                    cardholderName: ins.cardholderName,
+                    expiryDate: ins.expiryDate,
+                    cardPhotoUri: ins.cardPhotoUri,
+                  });
+                  await hydrateAfterLogin();
+                } catch {
+                  /* mock or offline — still enter the app */
+                }
+                router.replace('/(tabs)/home');
+              }}>
               <Text style={styles.finishBtnText}>Complete Setup</Text>
             </TouchableOpacity>
           </View>
