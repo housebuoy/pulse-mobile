@@ -290,9 +290,10 @@ export default function HospitalDetailsScreen() {
               const { usePaymentsStore } = await import('@/stores/payments-store');
               const deptId = useBookingStore.getState().departmentId ?? Number(department);
               const result = await bookMobile(deptId, selectedDate, selectedTime ?? '');
-              const id = result && typeof result === 'object' && 'id' in result
-                ? String((result as { id: unknown }).id)
-                : null;
+              const id =
+                result && typeof result === 'object' && 'id' in result
+                  ? String((result as { id: unknown }).id)
+                  : null;
               setLastBookingId(id);
               try {
                 const outstanding = await getOutstanding();
