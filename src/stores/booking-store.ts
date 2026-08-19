@@ -5,32 +5,42 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 interface BookingState {
   facilityName: string | null;
   facilityLocation: string | null;
+  hospitalId: string | null;
   department: string | null;
+  departmentId: number | null;
   selectedDate: string | null;
   selectedTime: string | null;
-  setFacility: (name: string, location: string) => void;
-  setDepartment: (department: string | null) => void;
+  lastBookingId: string | null;
+  setFacility: (name: string, location: string, hospitalId?: string) => void;
+  setDepartment: (department: string | null, departmentId?: number | null) => void;
   setSelectedDate: (date: string | null) => void;
   setSelectedTime: (time: string | null) => void;
+  setLastBookingId: (id: string | null) => void;
   reset: () => void;
 }
 
 const initialState = {
   facilityName: null,
   facilityLocation: null,
+  hospitalId: null,
   department: null,
+  departmentId: null,
   selectedDate: null,
   selectedTime: null,
+  lastBookingId: null,
 };
 
 export const useBookingStore = create<BookingState>()(
   persist(
     (set) => ({
       ...initialState,
-      setFacility: (facilityName, facilityLocation) => set({ facilityName, facilityLocation }),
-      setDepartment: (department) => set({ department }),
+      setFacility: (facilityName, facilityLocation, hospitalId) =>
+        set({ facilityName, facilityLocation, hospitalId: hospitalId ?? null }),
+      setDepartment: (department, departmentId) =>
+        set({ department, departmentId: departmentId ?? null }),
       setSelectedDate: (selectedDate) => set({ selectedDate }),
       setSelectedTime: (selectedTime) => set({ selectedTime }),
+      setLastBookingId: (lastBookingId) => set({ lastBookingId }),
       reset: () => set(initialState),
     }),
     {
