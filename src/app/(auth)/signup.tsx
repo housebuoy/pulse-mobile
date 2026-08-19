@@ -19,7 +19,32 @@ export default function SignUpScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [ghanaCard, setGhanaCard] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  const handleSignUp = async () => {
+    setError(null);
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    setBusy(true);
+    try {
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      const { signup } = await import('@/lib/api/auth');
+      await signup({ fullName, phone, password, ghanaCard });
+      await AsyncStorage.setItem('pulse_pending_signup', JSON.stringify({ phone, password }));
+      router.push({ pathname: '/(auth)/otp', params: { phone } });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Sign up failed');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -68,12 +93,35 @@ export default function SignUpScreen() {
               <View className="flex-row items-center rounded-2xl border border-gray-200 bg-white px-4 py-4 focus:border-[#2563EB]">
                 <Ionicons name="call-outline" size={20} color="#9CA3AF" />
                 <TextInput
+                  placeholder="Full Name"
+                  placeholderTextColor="#9CA3AF"
+                  className="ml-3 flex-1 text-base text-gray-900"
+                  value={fullName}
+                  onChangeText={setFullName}
+                />
+              </View>
+              <View className="flex-row items-center rounded-2xl border border-gray-200 bg-white px-4 py-4 focus:border-[#2563EB]">
+                <Ionicons name="call-outline" size={20} color="#9CA3AF" />
+                <TextInput
                   placeholder="Phone Number"
                   textContentType="username"
                   autoComplete="username"
                   placeholderTextColor="#9CA3AF"
                   className="ml-3 flex-1 text-base text-gray-900"
                   keyboardType="phone-pad"
+                  value={phone}
+                  onChangeText={setPhone}
+                />
+              </View>
+              <View className="flex-row items-center rounded-2xl border border-gray-200 bg-white px-4 py-4 focus:border-[#2563EB]">
+                <Ionicons name="card-outline" size={20} color="#9CA3AF" />
+                <TextInput
+                  placeholder="Ghana Card ID"
+                  placeholderTextColor="#9CA3AF"
+                  className="ml-3 flex-1 text-base text-gray-900"
+                  autoCapitalize="characters"
+                  value={ghanaCard}
+                  onChangeText={setGhanaCard}
                 />
               </View>
 
@@ -138,10 +186,14 @@ export default function SignUpScreen() {
             </View>
 
             {/* --- MAIN SIGN UP BUTTON (Routes to OTP) --- */}
+            {error ? (
+              <Text className="mb-3 text-center text-sm text-red-500">{error}</Text>
+            ) : null}
             <TouchableOpacity
               className="mb-8 items-center rounded-2xl bg-primary py-4 shadow-lg shadow-blue-500/40"
-              onPress={() => router.push('/(auth)/otp')}>
-              <Text className="text-lg font-bold text-white">Sign Up</Text>
+              disabled={busy}
+              onPress={handleSignUp}>
+              <Text className="text-lg font-bold text-white">{busy ? 'Sending OTP…' : 'Sign Up'}</Text>
             </TouchableOpacity>
 
             {/* --- DIVIDER --- */}
