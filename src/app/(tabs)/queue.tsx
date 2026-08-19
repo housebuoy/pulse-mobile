@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,26 @@ import { useQueueStore } from '@/stores/queue-store';
 export default function QueueScreen() {
   const router = useRouter();
   const ticket = useQueueStore((state) => state.ticket);
+  const setTicket = useQueueStore((state) => state.setTicket);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const { getMyTicket } = await import('@/lib/api/queue');
+        const next = await getMyTicket();
+        if (!cancelled && next) setTicket(next);
+      } catch {
+        /* keep last ticket */
+      }
+    };
+    void poll();
+    const id = setInterval(poll, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [setTicket]);
 
   // Check if we actually have an active queue ticket
   const hasActiveQueue = ticket && ticket.hospitalName;
@@ -44,8 +64,16 @@ export default function QueueScreen() {
   ];
 
   // Placeholder actions
-  const handleArrived = () =>
-    Alert.alert('Location Verified', 'You are now marked as present in the waiting room.');
+  const handleArrived = async () => {
+    try {
+      const { checkIn } = await import('@/lib/api/queue');
+      const next = await checkIn();
+      setTicket(next);
+      Alert.alert('Checked in', 'You are now in the hospital queue.');
+    } catch (e) {
+      Alert.alert('Check-in failed', e instanceof Error ? e.message : 'Try again at reception.');
+    }
+  };
   const handleCancel = () =>
     Alert.alert('Cancel Ticket', 'Are you sure you want to cancel your queue ticket?', [
       { text: 'No' },
