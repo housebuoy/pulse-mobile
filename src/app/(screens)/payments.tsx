@@ -15,7 +15,8 @@ export default function PaymentsScreen() {
   useEffect(() => {
     void (async () => {
       try {
-        const { getOutstanding, getPaymentMethods, getPaymentHistory } = await import('@/lib/api/patient');
+        const { getOutstanding, getPaymentMethods, getPaymentHistory } =
+          await import('@/lib/api/patient');
         const { usePaymentsStore } = await import('@/stores/payments-store');
         const [outstanding, methods, history] = await Promise.all([
           getOutstanding(),
