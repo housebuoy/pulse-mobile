@@ -64,10 +64,31 @@ interface MedicalState {
 
   addVitalsEntry: (entry: Omit<VitalsEntry, 'id' | 'date'>) => void;
   removeVitalsEntry: (id: string) => void;
+
+  hydrateFromApi: (data: {
+    bloodGroup?: string | null;
+    allergies?: AllergyEntry[];
+    conditions?: ConditionEntry[];
+    medications?: MedicationEntry[];
+    vitals?: VitalsEntry[];
+    emergencyContact?: EmergencyContact;
+  }) => void;
 }
 
 const makeId = () => `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
 const todayIso = () => new Date().toISOString().split('T')[0];
+
+async function persistMedical() {
+  const { useMedicalStore: store } = await import('@/stores/medical-store');
+  const s = store.getState();
+  const { patchMedical } = await import('@/lib/api/patient');
+  await patchMedical({
+    bloodGroup: s.bloodGroup,
+    allergies: s.allergies,
+    conditions: s.conditions,
+    medications: s.medications,
+  });
+}
 
 // Seeded with a light demo profile so the screen isn't empty on first open,
 // matching how the queue/profile stores ship with a demo record.
@@ -96,41 +117,75 @@ export const useMedicalStore = create<MedicalState>()(
         },
       ],
 
-      setBloodGroup: (bloodGroup) => set({ bloodGroup }),
+      setBloodGroup: (bloodGroup) => {
+        set({ bloodGroup });
+        void persistMedical();
+      },
 
-      addAllergy: (label, type) =>
+      addAllergy: (label, type) => {
         set((state) => ({
           allergies: [...state.allergies, { id: makeId(), label, type }],
-        })),
-      removeAllergy: (id) =>
-        set((state) => ({ allergies: state.allergies.filter((a) => a.id !== id) })),
+        }));
+        void persistMedical();
+      },
+      removeAllergy: (id) => {
+        set((state) => ({ allergies: state.allergies.filter((a) => a.id !== id) }));
+        void persistMedical();
+      },
 
-      addCondition: (label) =>
+      addCondition: (label) => {
         set((state) => ({
           conditions: [...state.conditions, { id: makeId(), label }],
-        })),
-      removeCondition: (id) =>
-        set((state) => ({ conditions: state.conditions.filter((c) => c.id !== id) })),
+        }));
+        void persistMedical();
+      },
+      removeCondition: (id) => {
+        set((state) => ({ conditions: state.conditions.filter((c) => c.id !== id) }));
+        void persistMedical();
+      },
 
-      addMedication: (name, dose) =>
+      addMedication: (name, dose) => {
         set((state) => ({
           medications: [...state.medications, { id: makeId(), name, dose }],
-        })),
-      updateMedication: (id, name, dose) =>
+        }));
+        void persistMedical();
+      },
+      updateMedication: (id, name, dose) => {
         set((state) => ({
           medications: state.medications.map((m) => (m.id === id ? { ...m, name, dose } : m)),
-        })),
-      removeMedication: (id) =>
-        set((state) => ({ medications: state.medications.filter((m) => m.id !== id) })),
+        }));
+        void persistMedical();
+      },
+      removeMedication: (id) => {
+        set((state) => ({ medications: state.medications.filter((m) => m.id !== id) }));
+        void persistMedical();
+      },
 
-      setEmergencyContact: (emergencyContact) => set({ emergencyContact }),
+      setEmergencyContact: (emergencyContact) => {
+        set({ emergencyContact });
+        void import('@/lib/api/patient').then(({ patchProfile }) =>
+          patchProfile({ emergencyContact })
+        );
+      },
 
-      addVitalsEntry: (entry) =>
+      addVitalsEntry: (entry) => {
         set((state) => ({
           vitals: [{ id: makeId(), date: todayIso(), ...entry }, ...state.vitals],
-        })),
+        }));
+        void import('@/lib/api/patient').then(({ addVitals }) => addVitals(entry));
+      },
       removeVitalsEntry: (id) =>
         set((state) => ({ vitals: state.vitals.filter((v) => v.id !== id) })),
+
+      hydrateFromApi: (data) =>
+        set((state) => ({
+          bloodGroup: data.bloodGroup !== undefined ? data.bloodGroup : state.bloodGroup,
+          allergies: data.allergies ?? state.allergies,
+          conditions: data.conditions ?? state.conditions,
+          medications: data.medications ?? state.medications,
+          vitals: data.vitals ?? state.vitals,
+          emergencyContact: data.emergencyContact ?? state.emergencyContact,
+        })),
     }),
     {
       name: 'pulse-medical-store',
