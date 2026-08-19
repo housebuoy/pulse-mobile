@@ -17,7 +17,27 @@ import { COLORS } from '@/constants/theme';
 
 export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  const handleSignIn = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const { login } = await import('@/lib/api/auth');
+      const { hydrateAfterLogin } = await import('@/lib/api/hydrate');
+      await login(identifier.trim(), password);
+      await hydrateAfterLogin();
+      router.replace('/(tabs)/home');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Sign in failed');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -61,6 +81,8 @@ export default function LoginScreen() {
                   className="ml-3 flex-1 text-base text-gray-900"
                   keyboardType="default"
                   autoCapitalize="none"
+                  value={identifier}
+                  onChangeText={setIdentifier}
                 />
               </View>
 
@@ -72,6 +94,8 @@ export default function LoginScreen() {
                   placeholderTextColor="#9CA3AF"
                   secureTextEntry={!showPassword}
                   className="ml-3 flex-1 text-base text-gray-900"
+                  value={password}
+                  onChangeText={setPassword}
                 />
                 {/* The Eye Toggle */}
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-1">
@@ -92,11 +116,15 @@ export default function LoginScreen() {
             </View>
 
             {/* --- MAIN SIGN IN BUTTON --- */}
+            {error ? (
+              <Text className="mb-3 text-center text-sm text-red-500">{error}</Text>
+            ) : null}
             <TouchableOpacity
               className="mb-8 items-center rounded-2xl py-4 shadow-lg shadow-blue-500/40"
-              style={{ backgroundColor: COLORS.primary }}
-              onPress={() => router.replace('/(tabs)/home')}>
-              <Text className="text-lg font-bold text-white">Sign In</Text>
+              style={{ backgroundColor: COLORS.primary, opacity: busy ? 0.7 : 1 }}
+              disabled={busy}
+              onPress={handleSignIn}>
+              <Text className="text-lg font-bold text-white">{busy ? 'Signing in…' : 'Sign In'}</Text>
             </TouchableOpacity>
 
             {/* --- DIVIDER --- */}
