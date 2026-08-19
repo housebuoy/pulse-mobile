@@ -1,4 +1,11 @@
-import { getProfile, getMedical, getInsurance, getOutstanding, getPaymentMethods, getPaymentHistory } from '@/lib/api/patient';
+import {
+  getProfile,
+  getMedical,
+  getInsurance,
+  getOutstanding,
+  getPaymentMethods,
+  getPaymentHistory,
+} from '@/lib/api/patient';
 import { getMyTicket } from '@/lib/api/queue';
 import { getRecords } from '@/lib/api/records';
 import { useProfileStore } from '@/stores/profile-store';

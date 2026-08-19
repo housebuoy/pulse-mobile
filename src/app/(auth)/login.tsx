@@ -116,15 +116,15 @@ export default function LoginScreen() {
             </View>
 
             {/* --- MAIN SIGN IN BUTTON --- */}
-            {error ? (
-              <Text className="mb-3 text-center text-sm text-red-500">{error}</Text>
-            ) : null}
+            {error ? <Text className="mb-3 text-center text-sm text-red-500">{error}</Text> : null}
             <TouchableOpacity
               className="mb-8 items-center rounded-2xl py-4 shadow-lg shadow-blue-500/40"
               style={{ backgroundColor: COLORS.primary, opacity: busy ? 0.7 : 1 }}
               disabled={busy}
               onPress={handleSignIn}>
-              <Text className="text-lg font-bold text-white">{busy ? 'Signing in…' : 'Sign In'}</Text>
+              <Text className="text-lg font-bold text-white">
+                {busy ? 'Signing in…' : 'Sign In'}
+              </Text>
             </TouchableOpacity>
 
             {/* --- DIVIDER --- */}
