@@ -55,10 +55,14 @@ interface PaymentsState {
   setDefaultPaymentMethod: (id: string) => void;
   removePaymentMethod: (id: string) => void;
 
-  // MOCK — marks the given bookings paid locally and files them in history.
-  // A real integration initiates a gateway charge and only updates state
-  // once a webhook/callback confirms the charge succeeded.
-  payBookings: (bookingIds: string[], methodId: string) => void;
+  hydrateFromApi: (data: {
+    outstanding?: OutstandingBooking[];
+    methods?: PaymentMethod[];
+    history?: PaymentHistoryEntry[];
+  }) => void;
+
+  // Real path: POST /me/payments → open checkoutUrl. Never marks PAID locally.
+  payBookings: (bookingIds: string[], methodId: string) => Promise<void>;
 }
 
 const makeId = () => `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
@@ -149,25 +153,27 @@ export const usePaymentsStore = create<PaymentsState>()(
           return { paymentMethods: remaining };
         }),
 
-      payBookings: (bookingIds, methodId) => {
-        const state = get();
-        const method = state.paymentMethods.find((m) => m.id === methodId);
-        if (!method) return;
-        const now = new Date().toISOString();
-        const paidEntries: PaymentHistoryEntry[] = state.outstandingBookings
-          .filter((b) => bookingIds.includes(b.id))
-          .map((b) => ({
-            id: makeId(),
-            facilityName: b.facilityName,
-            department: b.department,
-            methodLabel: method.label,
-            paidDate: now,
-            amount: b.feeAmount,
-          }));
-        set({
-          outstandingBookings: state.outstandingBookings.filter((b) => !bookingIds.includes(b.id)),
-          paymentHistory: [...paidEntries, ...state.paymentHistory],
-        });
+      hydrateFromApi: (data) =>
+        set((state) => ({
+          outstandingBookings: data.outstanding ?? state.outstandingBookings,
+          paymentMethods: data.methods ?? state.paymentMethods,
+          paymentHistory: data.history ?? state.paymentHistory,
+        })),
+
+      payBookings: async (bookingIds, methodId) => {
+        const { startCheckout, getOutstanding, getPaymentHistory } = await import('@/lib/api/patient');
+        const { Linking } = await import('react-native');
+        const { checkoutUrl } = await startCheckout(bookingIds, methodId);
+        if (checkoutUrl) {
+          await Linking.openURL(checkoutUrl);
+        }
+        try {
+          const [outstanding, history] = await Promise.all([getOutstanding(), getPaymentHistory()]);
+          get().hydrateFromApi({ outstanding, history });
+        } catch {
+          // webhook flips PAID — local list stays until refetch succeeds
+        }
+        void methodId;
       },
     }),
     {

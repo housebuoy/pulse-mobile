@@ -8,12 +8,9 @@ import CustomButton from '@/components/ui/custom-button';
 import { ToastBanner, ToastVariant } from '@/components/ui/toast-banner';
 import MonthSelector from '@/components/book-appointment/month-selector';
 import DateStrip from '@/components/book-appointment/date-strip';
-import {
-  fetchMockAvailability,
-  HospitalAvailability,
-  MockTimeSlot,
-} from '@/services/mock/hospital-schedule';
+import { HospitalAvailability, MockTimeSlot } from '@/services/mock/hospital-schedule';
 import { useQueueStore } from '@/stores/queue-store';
+import { useBookingStore } from '@/stores/booking-store';
 
 const HOSPITAL_ID = 'knust-university-hospital';
 
@@ -41,12 +38,19 @@ export default function RescheduleScreen() {
   useEffect(() => {
     let cancelled = false;
     setLoadingAvailability(true);
-    fetchMockAvailability(HOSPITAL_ID, currentMonth).then((data) => {
-      if (!cancelled) {
-        setAvailability(data);
-        setLoadingAvailability(false);
-      }
-    });
+    const deptId = useBookingStore.getState().departmentId ?? HOSPITAL_ID;
+    const from = currentMonth.toISOString().split('T')[0];
+    import('@/lib/api/discovery')
+      .then(({ getAvailability }) => getAvailability(deptId, from, 14))
+      .then((data) => {
+        if (!cancelled) {
+          setAvailability(data);
+          setLoadingAvailability(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadingAvailability(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -167,9 +171,23 @@ export default function RescheduleScreen() {
         <CustomButton
           title="Confirm Reschedule"
           disabled={!selectedDate || !selectedTime}
-          onPress={() => {
-            // Here is where Zustand will eventually fire an action to update the queue!
-            // handleDateSelect();
+          onPress={async () => {
+            try {
+              const { rescheduleBooking } = await import('@/lib/api/discovery');
+              const bookingId = useBookingStore.getState().lastBookingId;
+              if (!bookingId) {
+                setToastData({ message: 'No booking to reschedule.', variant: 'error' });
+                return;
+              }
+              await rescheduleBooking(bookingId, selectedDate, selectedTime ?? '');
+              setToastData({ message: 'Appointment rescheduled.', variant: 'success' });
+              router.back();
+            } catch (e) {
+              setToastData({
+                message: e instanceof Error ? e.message : 'Reschedule failed',
+                variant: 'error',
+              });
+            }
           }}
         />
       </View>

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -38,6 +38,14 @@ export default function RecordsScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const visits = useRecordsStore((state) => state.visits);
+  const hydrateFromApi = useRecordsStore((state) => state.hydrateFromApi);
+
+  useEffect(() => {
+    import('@/lib/api/records')
+      .then(({ getRecords }) => getRecords())
+      .then(hydrateFromApi)
+      .catch(() => undefined);
+  }, [hydrateFromApi]);
   const labResults = useRecordsStore((state) => state.labResults);
   const prescriptions = useRecordsStore((state) => state.prescriptions);
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -14,10 +14,32 @@ import DiscoveryCard from '@/components/cards/discovery-card';
 import UpcomingAppointmentCard from '@/components/cards/upcoming-card';
 import IconButton from '@/components/ui/header-badge';
 import { useQueueStore } from '@/stores/queue-store';
+import { useProfileStore } from '@/stores/profile-store';
 
 export default function HomeScreen() {
   const router = useRouter();
   const ticket = useQueueStore((state) => state.ticket);
+  const setTicket = useQueueStore((state) => state.setTicket);
+  const identity = useProfileStore((state) => state.identity);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const { getMyTicket } = await import('@/lib/api/queue');
+        const next = await getMyTicket();
+        if (!cancelled && next) setTicket(next);
+      } catch {
+        /* keep last */
+      }
+    };
+    void poll();
+    const id = setInterval(poll, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [setTicket]);
   
   // Toggle this state ('live' | 'upcoming' | 'empty') to test your different layouts
   const [patientStatus, setPatientStatus] = useState<'live' | 'upcoming' | 'empty'>('live');
@@ -41,7 +63,7 @@ export default function HomeScreen() {
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.greetingText}>{greeting},</Text>
-          <Text style={styles.nameText}>Kwame</Text>
+          <Text style={styles.nameText}>{identity?.firstName ?? 'Kwame'}</Text>
         </View>
         <IconButton
           icon="notifications-outline"

@@ -29,7 +29,14 @@ export default function InsurancePhotoCard() {
     });
 
     if (!result.canceled && result.assets?.[0]?.uri) {
-      setCardPhotoUri(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setCardPhotoUri(uri);
+      void import('@/lib/api/patient').then(async ({ uploadImage, putInsurance, getInsurance }) => {
+        const uploaded = await uploadImage(uri);
+        const current = await getInsurance();
+        await putInsurance({ ...current, cardPhotoUri: uploaded.url });
+        setCardPhotoUri(uploaded.url);
+      });
     }
   };
 

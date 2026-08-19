@@ -32,14 +32,21 @@ export default function PayBookingSheet({ visible, onClose, bookings }: PayBooki
 
   const total = bookings.reduce((sum, b) => sum + b.feeAmount, 0);
 
-  const handlePay = () => {
+  const handlePay = async () => {
     if (!selectedMethodId) return;
-    payBookings(
-      bookings.map((b) => b.id),
-      selectedMethodId
-    );
-    onClose();
-    Alert.alert('Payment recorded', `${formatGHS(total)} marked as paid.`);
+    try {
+      await payBookings(
+        bookings.map((b) => b.id),
+        selectedMethodId
+      );
+      onClose();
+      Alert.alert(
+        'Checkout opened',
+        'Complete payment in the browser. Your bookings update after the hospital confirms.'
+      );
+    } catch (e) {
+      Alert.alert('Payment failed', e instanceof Error ? e.message : 'Try again');
+    }
   };
 
   return (

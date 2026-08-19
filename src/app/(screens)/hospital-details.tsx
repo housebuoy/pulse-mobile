@@ -11,15 +11,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS } from '@/constants/theme';
 import DateStrip from '@/components/book-appointment/date-strip';
 import MonthSelector from '@/components/book-appointment/month-selector';
 import TimeSlotPicker, { TimeSlot } from '@/components/book-appointment/time-slot-picker';
 import Divider from '@/components/ui/divider';
 import Dropdown, { DropdownOption } from '@/components/ui/dropdown-menu';
-import { fetchMockAvailability, HospitalAvailability } from '@/services/mock/hospital-schedule';
+import { HospitalAvailability } from '@/services/mock/hospital-schedule';
 import { useBookingStore } from '@/stores/booking-store';
+import type { DepartmentOption } from '@/lib/api/discovery';
 
 // const { width, height } = Dimensions.get('window');
 const HEADER_HEIGHT = 280; // Total height of the image area
@@ -27,31 +28,45 @@ const HEADER_HEIGHT = 280; // Total height of the image area
 const { width } = Dimensions.get('window');
 
 // --- Mock Data ---
-const HOSPITAL_ID = 'knust-university-hospital';
-const HOSPITAL = {
+const FALLBACK_HOSPITAL = {
   name: 'KNUST University Hospital',
   location: 'University Road, Kumasi',
   rating: 4.8,
   reviews: '120+',
   image:
-    'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?q=80&w=1000&auto=format&fit=crop', // Placeholder building image
+    'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?q=80&w=1000&auto=format&fit=crop',
   distance: '2.5 km',
   waitTime: 'Low',
   status: 'Open 24/7',
 };
 
-const DEPARTMENTS: DropdownOption[] = [
-  { label: 'General OPD', value: 'general' },
-  { label: 'Cardiology', value: 'cardiology' },
-  { label: 'Dental Clinic', value: 'dental' },
-  { label: 'Eye Clinic', value: 'eye' },
-  { label: 'Pediatrics', value: 'pediatrics' },
-];
-
 const TODAY_ISO = new Date().toISOString().split('T')[0];
 
 export default function HospitalDetailsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    id?: string;
+    name?: string;
+    location?: string;
+    distance?: string;
+    waitStatus?: string;
+    rating?: string;
+    reviews?: string;
+    imageUrl?: string;
+    status?: string;
+  }>();
+
+  const HOSPITAL = {
+    id: params.id ?? '1',
+    name: params.name ?? FALLBACK_HOSPITAL.name,
+    location: params.location ?? FALLBACK_HOSPITAL.location,
+    rating: params.rating ? Number(params.rating) : FALLBACK_HOSPITAL.rating,
+    reviews: params.reviews ?? FALLBACK_HOSPITAL.reviews,
+    image: params.imageUrl ?? FALLBACK_HOSPITAL.image,
+    distance: params.distance ?? FALLBACK_HOSPITAL.distance,
+    waitTime: params.waitStatus ?? FALLBACK_HOSPITAL.waitTime,
+    status: params.status ?? FALLBACK_HOSPITAL.status,
+  };
 
   // --- Booking selection now lives in the shared booking store, so it
   // survives navigating away and back (and app reloads). ---
@@ -62,10 +77,27 @@ export default function HospitalDetailsScreen() {
   const setDepartment = useBookingStore((state) => state.setDepartment);
   const setSelectedDate = useBookingStore((state) => state.setSelectedDate);
   const setSelectedTime = useBookingStore((state) => state.setSelectedTime);
+  const setLastBookingId = useBookingStore((state) => state.setLastBookingId);
+
+  const [deptOptions, setDeptOptions] = useState<DropdownOption[]>([]);
+  const [deptMap, setDeptMap] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    setFacility(HOSPITAL.name, HOSPITAL.location);
-  }, [setFacility]);
+    setFacility(HOSPITAL.name, HOSPITAL.location, HOSPITAL.id);
+  }, [setFacility, HOSPITAL.name, HOSPITAL.location, HOSPITAL.id]);
+
+  useEffect(() => {
+    import('@/lib/api/discovery').then(({ listDepartments }) =>
+      listDepartments(HOSPITAL.id).then((rows: DepartmentOption[]) => {
+        setDeptOptions(rows.map((d) => ({ label: d.name, value: String(d.id) })));
+        const map: Record<string, number> = {};
+        rows.forEach((d) => {
+          map[String(d.id)] = d.id;
+        });
+        setDeptMap(map);
+      })
+    );
+  }, [HOSPITAL.id]);
 
   // --- Calendar cursor (which month is displayed) stays local UI state ---
   const [currentMonth, setCurrentMonth] = useState(
@@ -80,16 +112,20 @@ export default function HospitalDetailsScreen() {
   useEffect(() => {
     let cancelled = false;
     setLoadingAvailability(true);
-    fetchMockAvailability(HOSPITAL_ID, currentMonth).then((data) => {
-      if (!cancelled) {
-        setAvailability(data);
-        setLoadingAvailability(false);
-      }
-    });
+    const from = currentMonth.toISOString().split('T')[0];
+    const deptId = department && deptMap[department] ? deptMap[department] : department;
+    import('@/lib/api/discovery').then(({ getAvailability }) =>
+      getAvailability(deptId || HOSPITAL.id, from, 14).then((data) => {
+        if (!cancelled) {
+          setAvailability(data);
+          setLoadingAvailability(false);
+        }
+      })
+    );
     return () => {
       cancelled = true;
     };
-  }, [currentMonth]);
+  }, [currentMonth, department, deptMap, HOSPITAL.id]);
 
   const daySlots = availability?.slots[selectedDate];
   const flatSlots: TimeSlot[] = daySlots ? [...daySlots.MORNING, ...daySlots.AFTERNOON] : [];
@@ -193,9 +229,9 @@ export default function HospitalDetailsScreen() {
 
           <Dropdown
             label="Department"
-            options={DEPARTMENTS}
+            options={deptOptions}
             selected={department}
-            onSelect={setDepartment}
+            onSelect={(value) => setDepartment(value, deptMap[value] ?? Number(value))}
             placeholder="Select a department"
           />
 
@@ -247,7 +283,28 @@ export default function HospitalDetailsScreen() {
             (!selectedDate || !selectedTime) && styles.proceedButtonDisabled,
           ]}
           disabled={!selectedDate || !selectedTime}
-          onPress={() => alert('Proceed to confirmation!')}>
+          onPress={async () => {
+            try {
+              const { bookMobile } = await import('@/lib/api/discovery');
+              const { getOutstanding } = await import('@/lib/api/patient');
+              const { usePaymentsStore } = await import('@/stores/payments-store');
+              const deptId = useBookingStore.getState().departmentId ?? Number(department);
+              const result = await bookMobile(deptId, selectedDate, selectedTime ?? '');
+              const id = result && typeof result === 'object' && 'id' in result
+                ? String((result as { id: unknown }).id)
+                : null;
+              setLastBookingId(id);
+              try {
+                const outstanding = await getOutstanding();
+                usePaymentsStore.getState().hydrateFromApi({ outstanding });
+              } catch {
+                /* ignore */
+              }
+              router.replace('/(tabs)/home');
+            } catch (e) {
+              alert(e instanceof Error ? e.message : 'Booking failed');
+            }
+          }}>
           <Text style={styles.proceedButtonText}>Proceed</Text>
           <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
         </TouchableOpacity>
