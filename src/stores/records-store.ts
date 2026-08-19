@@ -45,11 +45,16 @@ interface RecordsState {
   visits: Visit[];
   labResults: LabResult[];
   prescriptions: Prescription[];
+  hydrateFromApi: (data: {
+    visits?: Visit[];
+    labResults?: LabResult[];
+    prescriptions?: Prescription[];
+  }) => void;
 }
 
 export const useRecordsStore = create<RecordsState>()(
   persist(
-    () => ({
+    (set) => ({
       visits: [
         {
           id: 'visit-1',
@@ -156,6 +161,13 @@ export const useRecordsStore = create<RecordsState>()(
           date: '2024-02-15',
         },
       ],
+
+      hydrateFromApi: (data) =>
+        set((state) => ({
+          visits: data.visits ?? state.visits,
+          labResults: data.labResults ?? state.labResults,
+          prescriptions: data.prescriptions ?? state.prescriptions,
+        })),
     }),
     {
       name: 'pulse-records-store',
