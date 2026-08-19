@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,13 +9,21 @@ import EmergencyBanner from '../../components/ui/emergency-banner';
 import CategoryPills from '../../components/ui/category-pills';
 import HospitalCard from '../../components/ui/hospital-card';
 import SectionHeader from '@/components/shared/section-header';
+import type { HospitalCard as HospitalCardData } from '@/lib/api/discovery';
 
 const BANNER_HEIGHT = 80;
 
 export default function BookAppointmentScreen() {
   const router = useRouter();
   const [activeCategory, setActiveCategory] = useState('General');
+  const [hospitals, setHospitals] = useState<HospitalCardData[]>([]);
   const scrollY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    import('@/lib/api/discovery').then(({ listHospitals }) =>
+      listHospitals().then(setHospitals).catch(() => setHospitals([]))
+    );
+  }, []);
 
   const sosOpacity = scrollY.interpolate({
     inputRange: [BANNER_HEIGHT * 0.5, BANNER_HEIGHT],
@@ -89,9 +97,40 @@ export default function BookAppointmentScreen() {
         {/* CHILD 2 — cards */}
         <View style={styles.cardsWrapper}>
           <SectionHeader title="Available Hospitals" />
-          <HospitalCard name="KNUST University Hospital" location="University Road, Kumasi • Open 24/7" distance="2.5 km" waitStatus="Low Wait" nextSlot="10:30 AM" rating="4.8 (120+)" imageUrl="https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?q=80&w=2000&auto=format&fit=crop" onPress={() => router.push({ pathname: '/(screens)/hospital-details', params: { name: 'KNUST University Hospital', location: 'University Road, Kumasi • Open 24/7', distance: '2.5 km', waitStatus: 'Low Wait', nextSlot: '10:30 AM', rating: '4.8 (120+)', imageUrl: 'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?q=80&w=2000&auto=format&fit=crop', status: 'Open 24/7' } })} />
-          <HospitalCard name="Komfo Anokye Teaching" location="Bantama, Kumasi • Referral Center" distance="4.2 km" waitStatus="Moderate Wait" nextSlot="2:15 PM" rating="4.5 (850+)" imageUrl="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=2000&auto=format&fit=crop" onPress={() => router.push({ pathname: '/(screens)/hospital-details', params: { name: 'Komfo Anokye Teaching', location: 'Bantama, Kumasi • Referral Center', distance: '4.2 km', waitStatus: 'Moderate Wait', nextSlot: '2:15 PM', rating: '4.5 (850+)', imageUrl: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?q=80&w=2000&auto=format&fit=crop', status: 'Referral Center' } })} />
-          <HospitalCard name="HopeXchange Medical" location="Santasi, Kumasi • Specialist Care" distance="1.8 km" waitStatus="High Wait" nextSlot="Tomorrow" rating="4.9 (56)" imageUrl="https://images.unsplash.com/photo-1538108149393-fbbd81895907?q=80&w=2000&auto=format&fit=crop" onPress={() => router.push({ pathname: '/(screens)/hospital-details', params: { name: 'HopeXchange Medical', location: 'Santasi, Kumasi • Specialist Care', distance: '1.8 km', waitStatus: 'High Wait', nextSlot: 'Tomorrow', rating: '4.9 (56)', imageUrl: 'https://images.unsplash.com/photo-1538108149393-fbbd81895907?q=80&w=2000&auto=format&fit=crop', status: 'Specialist Care' } })} />
+          {hospitals.map((h) => (
+            <HospitalCard
+              key={h.id}
+              name={h.name}
+              location={`${h.location} • ${h.status}`}
+              distance={h.distanceKm != null ? `${h.distanceKm} km` : '—'}
+              waitStatus={
+                /high/i.test(h.waitTime)
+                  ? 'High Wait'
+                  : /moderat/i.test(h.waitTime)
+                    ? 'Moderate Wait'
+                    : 'Low Wait'
+              }
+              nextSlot="—"
+              rating={`${h.rating} (${h.reviews})`}
+              imageUrl={h.image}
+              onPress={() =>
+                router.push({
+                  pathname: '/(screens)/hospital-details',
+                  params: {
+                    id: h.id,
+                    name: h.name,
+                    location: h.location,
+                    distance: h.distanceKm != null ? `${h.distanceKm} km` : '—',
+                    waitStatus: h.waitTime,
+                    rating: String(h.rating),
+                    reviews: h.reviews,
+                    imageUrl: h.image,
+                    status: h.status,
+                  },
+                })
+              }
+            />
+          ))}
         </View>
       </Animated.ScrollView>
 
