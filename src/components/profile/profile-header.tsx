@@ -2,8 +2,13 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
+import { useProfileStore } from '@/stores/profile-store';
 
 export default function ProfileHeader() {
+  const identity = useProfileStore((state) => state.identity);
+  const name = identity
+    ? `${identity.firstName} ${identity.lastName}`.trim()
+    : 'Kelvin Quarcoo';
   return (
     <View style={styles.container}>
       {/* Avatar Section */}
@@ -20,9 +25,9 @@ export default function ProfileHeader() {
 
       {/* User Info */}
       <View style={styles.infoContainer}>
-        <Text style={styles.userName}>Kelvin Quarcoo</Text>
-        <Text style={styles.contactText}>kelvin@email.com</Text>
-        <Text style={styles.contactText}>+233 55 123 4567</Text>
+        <Text style={styles.userName}>{name}</Text>
+        <Text style={styles.contactText}>{identity?.email ?? 'kelvin@email.com'}</Text>
+        <Text style={styles.contactText}>{identity?.phone ?? '+233 55 123 4567'}</Text>
       </View>
     </View>
   );
