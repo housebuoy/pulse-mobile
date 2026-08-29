@@ -18,6 +18,7 @@ export default function BookAppointmentScreen() {
   const [activeCategory, setActiveCategory] = useState('General');
   const [hospitals, setHospitals] = useState<HospitalCardData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
   const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -56,6 +57,21 @@ export default function BookAppointmentScreen() {
     extrapolate: 'clamp',
   });
 
+  // Live search + category filtering of the hospital list (FE-18). 'General'
+  // category means "show everything"; other pills match hospital specialties.
+  const filteredHospitals = hospitals.filter((h) => {
+    const q = query.trim().toLowerCase();
+    const matchesQuery =
+      !q ||
+      h.name.toLowerCase().includes(q) ||
+      h.location.toLowerCase().includes(q) ||
+      (h.specialties ?? []).some((s) => s.toLowerCase().includes(q));
+    const matchesCategory =
+      activeCategory === 'General' ||
+      (h.specialties ?? []).some((s) => s.toLowerCase().includes(activeCategory.toLowerCase()));
+    return matchesQuery && matchesCategory;
+  });
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* 1. HEADER */}
@@ -75,7 +91,7 @@ export default function BookAppointmentScreen() {
 
       {/* 2. SEARCH BAR — pinned */}
       <View style={styles.searchContainer}>
-        <SearchBar />
+        <SearchBar value={query} onChangeText={setQuery} />
       </View>
 
       {/* 3. SCROLL */}
@@ -123,8 +139,10 @@ export default function BookAppointmentScreen() {
             <Text style={styles.emptyText}>
               No hospitals available right now. Please check back soon.
             </Text>
+          ) : filteredHospitals.length === 0 ? (
+            <Text style={styles.emptyText}>No hospitals match your search.</Text>
           ) : (
-            hospitals.map((h) => (
+            filteredHospitals.map((h) => (
               <HospitalCard
                 key={h.id}
                 name={h.name}
