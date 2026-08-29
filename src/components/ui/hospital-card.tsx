@@ -9,20 +9,34 @@ interface HospitalCardProps {
   waitStatus: 'Low Wait' | 'Moderate Wait' | 'High Wait';
   nextSlot: string;
   rating: string;
-  imageUrl: string;
+  imageUrl: string | null;
   onPress: () => void;
 }
 
+// The backend seed has no hospital image URLs (image: null) — fall back to a
+// generic facility photo so cards never render blank (bug-triage FE-14).
+const FALLBACK_IMAGE =
+  'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?q=80&w=1000&auto=format&fit=crop';
+
 export default function HospitalCard({
-  name, location, distance, waitStatus, nextSlot, rating, imageUrl, onPress
+  name,
+  location,
+  distance,
+  waitStatus,
+  nextSlot,
+  rating,
+  imageUrl,
+  onPress,
 }: HospitalCardProps) {
-  
   // Determine badge colors based on wait status
   const getBadgeStyle = () => {
     switch (waitStatus) {
-      case 'Low Wait': return { bg: '#DCFCE7', text: '#16A34A' };
-      case 'Moderate Wait': return { bg: '#FEF9C3', text: '#CA8A04' };
-      case 'High Wait': return { bg: '#FEE2E2', text: '#DC2626' };
+      case 'Low Wait':
+        return { bg: '#DCFCE7', text: '#16A34A' };
+      case 'Moderate Wait':
+        return { bg: '#FEF9C3', text: '#CA8A04' };
+      case 'High Wait':
+        return { bg: '#FEE2E2', text: '#DC2626' };
     }
   };
   const badgeColors = getBadgeStyle();
@@ -31,7 +45,7 @@ export default function HospitalCard({
     <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={onPress}>
       {/* Image & Distance Pill */}
       <View style={styles.imageContainer}>
-        <Image source={{ uri: imageUrl }} style={styles.image} />
+        <Image source={{ uri: imageUrl || FALLBACK_IMAGE }} style={styles.image} />
         <View style={styles.distanceBadge}>
           <Ionicons name="navigate" size={12} color={COLORS.primary} />
           <Text style={styles.distanceText}>{distance}</Text>
@@ -41,12 +55,14 @@ export default function HospitalCard({
       {/* Details Section */}
       <View style={styles.detailsContainer}>
         <View style={styles.titleRow}>
-          <Text style={styles.nameText} numberOfLines={1}>{name}</Text>
+          <Text style={styles.nameText} numberOfLines={1}>
+            {name}
+          </Text>
           <View style={[styles.waitBadge, { backgroundColor: badgeColors.bg }]}>
             <Text style={[styles.waitText, { color: badgeColors.text }]}>{waitStatus}</Text>
           </View>
         </View>
-        
+
         <Text style={styles.locationText}>{location}</Text>
 
         <View style={styles.footerRow}>
@@ -142,5 +158,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#4B5563',
     fontWeight: '500',
-  }
+  },
 });
