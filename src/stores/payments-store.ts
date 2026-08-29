@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Linking } from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
@@ -163,7 +164,10 @@ export const usePaymentsStore = create<PaymentsState>()(
       payBookings: async (bookingIds, methodId) => {
         const { startCheckout, getOutstanding, getPaymentHistory } =
           await import('@/lib/api/patient');
-        const { Linking } = await import('react-native');
+        // NOTE: Linking is imported statically at the top of this file. A
+        // dynamic `await import('react-native')` here crashed the app in
+        // Expo Go (Metro's importAll eagerly initializes PushNotificationIOS,
+        // whose native module is missing) — bug-triage FE-8.
         const { checkoutUrl } = await startCheckout(bookingIds, methodId);
         if (checkoutUrl) {
           await Linking.openURL(checkoutUrl);
