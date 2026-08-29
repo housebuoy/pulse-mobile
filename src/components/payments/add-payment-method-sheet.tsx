@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 import { PaymentNetwork, usePaymentsStore } from '@/stores/payments-store';
@@ -21,7 +31,11 @@ interface AddPaymentMethodSheetProps {
 
 // Mock add flow — only ever collects the last 4 digits (a display aid) and
 // never a full card/MoMo number, PIN, or CVV. See payments-store.ts for why.
-export default function AddPaymentMethodSheet({ visible, onClose, onAdded }: AddPaymentMethodSheetProps) {
+export default function AddPaymentMethodSheet({
+  visible,
+  onClose,
+  onAdded,
+}: AddPaymentMethodSheetProps) {
   const addPaymentMethod = usePaymentsStore((state) => state.addPaymentMethod);
   const paymentMethods = usePaymentsStore((state) => state.paymentMethods);
 
@@ -53,93 +67,112 @@ export default function AddPaymentMethodSheet({ visible, onClose, onAdded }: Add
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose}>
-        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Add Payment Method</Text>
-            <TouchableOpacity onPress={handleClose}>
-              <Ionicons name="close" size={20} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.sheetBody}>
-            <Text style={styles.inputLabel}>Network</Text>
-            <View style={styles.networkGrid}>
-              {NETWORK_OPTIONS.map((opt) => {
-                const active = network === opt.value;
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[styles.networkChip, active && styles.networkChipActive]}
-                    onPress={() => setNetwork(opt.value)}>
-                    <NetworkBadge network={opt.value} size={20} />
-                    <Text style={[styles.networkChipText, active && styles.networkChipTextActive]}>
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose}>
+          <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Add Payment Method</Text>
+              <TouchableOpacity onPress={handleClose}>
+                <Ionicons name="close" size={20} color="#6B7280" />
+              </TouchableOpacity>
             </View>
 
-            {network === 'card' && (
-              <>
-                <Text style={[styles.inputLabel, { marginTop: 16 }]}>Card Brand</Text>
-                <View style={styles.networkGrid}>
-                  {CARD_BRANDS.map((b) => {
-                    const active = brand === b;
-                    return (
-                      <TouchableOpacity
-                        key={b}
-                        style={[styles.networkChip, active && styles.networkChipActive]}
-                        onPress={() => setBrand(b)}>
-                        <Text style={[styles.networkChipText, active && styles.networkChipTextActive]}>
-                          {b}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </>
-            )}
+            <ScrollView
+              style={styles.sheetBody}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}>
+              <Text style={styles.inputLabel}>Network</Text>
+              <View style={styles.networkGrid}>
+                {NETWORK_OPTIONS.map((opt) => {
+                  const active = network === opt.value;
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[styles.networkChip, active && styles.networkChipActive]}
+                      onPress={() => setNetwork(opt.value)}>
+                      <NetworkBadge network={opt.value} size={20} />
+                      <Text
+                        style={[styles.networkChipText, active && styles.networkChipTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-            <Text style={[styles.inputLabel, { marginTop: 16 }]}>
-              Last 4 Digits{' '}
-              <Text style={styles.inputLabelHint}>
-                ({network === 'card' ? 'of your card' : 'of your mobile number'})
-              </Text>
-            </Text>
-            <TextInput
-              value={last4}
-              onChangeText={(text) => setLast4(text.replace(/[^0-9]/g, '').slice(0, 4))}
-              placeholder="e.g. 4567"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="number-pad"
-              maxLength={4}
-              style={styles.input}
-            />
-            <Text style={styles.hint}>
-              We never ask for or store your full number, PIN, or CVV — just enough to help you
-              recognize this method later.
-            </Text>
+              {network === 'card' && (
+                <>
+                  <Text style={[styles.inputLabel, { marginTop: 16 }]}>Card Brand</Text>
+                  <View style={styles.networkGrid}>
+                    {CARD_BRANDS.map((b) => {
+                      const active = brand === b;
+                      return (
+                        <TouchableOpacity
+                          key={b}
+                          style={[styles.networkChip, active && styles.networkChipActive]}
+                          onPress={() => setBrand(b)}>
+                          <Text
+                            style={[
+                              styles.networkChipText,
+                              active && styles.networkChipTextActive,
+                            ]}>
+                            {b}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
 
-            <TouchableOpacity
-              style={[styles.confirmButton, !isValid && styles.confirmButtonDisabled]}
-              disabled={!isValid}
-              onPress={handleSave}>
-              <Text style={styles.confirmButtonText}>
-                {paymentMethods.length === 0 ? 'Save as Default' : 'Save Method'}
+              <Text style={[styles.inputLabel, { marginTop: 16 }]}>
+                Last 4 Digits{' '}
+                <Text style={styles.inputLabelHint}>
+                  ({network === 'card' ? 'of your card' : 'of your mobile number'})
+                </Text>
               </Text>
-            </TouchableOpacity>
+              <TextInput
+                value={last4}
+                onChangeText={(text) => setLast4(text.replace(/[^0-9]/g, '').slice(0, 4))}
+                placeholder="e.g. 4567"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="number-pad"
+                maxLength={4}
+                style={styles.input}
+              />
+              <Text style={styles.hint}>
+                We never ask for or store your full number, PIN, or CVV — just enough to help you
+                recognize this method later.
+              </Text>
+
+              <TouchableOpacity
+                style={[styles.confirmButton, !isValid && styles.confirmButtonDisabled]}
+                disabled={!isValid}
+                onPress={handleSave}>
+                <Text style={styles.confirmButtonText}>
+                  {paymentMethods.length === 0 ? 'Save as Default' : 'Save Method'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardView: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8 },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    maxHeight: '85%',
+  },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
