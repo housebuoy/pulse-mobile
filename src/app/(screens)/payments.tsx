@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -11,35 +11,38 @@ import PaymentHistoryCard from '@/components/payments/payment-history-card';
 
 export default function PaymentsScreen() {
   const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      const { getOutstanding, getPaymentMethods, getPaymentHistory } =
+        await import('@/lib/api/patient');
+      const { usePaymentsStore } = await import('@/stores/payments-store');
+      const [outstanding, methods, history] = await Promise.all([
+        getOutstanding(),
+        getPaymentMethods(),
+        getPaymentHistory(),
+      ]);
+      usePaymentsStore.getState().hydrateFromApi({ outstanding, methods, history });
+    } catch {
+      /* keep seeds */
+    }
+  }, []);
 
   // Refetch on every focus (not just mount): returning from the Aza hosted
   // checkout must surface the PAID flip + new history rows the webhook wrote
   // (bug-triage FE-10).
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      void (async () => {
-        try {
-          const { getOutstanding, getPaymentMethods, getPaymentHistory } =
-            await import('@/lib/api/patient');
-          const { usePaymentsStore } = await import('@/stores/payments-store');
-          const [outstanding, methods, history] = await Promise.all([
-            getOutstanding(),
-            getPaymentMethods(),
-            getPaymentHistory(),
-          ]);
-          if (active) {
-            usePaymentsStore.getState().hydrateFromApi({ outstanding, methods, history });
-          }
-        } catch {
-          /* keep seeds */
-        }
-      })();
-      return () => {
-        active = false;
-      };
-    }, [])
+      void loadData();
+    }, [loadData])
   );
+
+  // Pull-to-refresh (FE-20) — same loader, manual trigger.
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData().finally(() => setRefreshing(false));
+  }, [loadData]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -51,7 +54,10 @@ export default function PaymentsScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         <PaymentsHeroCard />
         <OutstandingPaymentsCard />
         <SavedMethodsCard />
