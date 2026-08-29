@@ -109,6 +109,7 @@ export default function HospitalDetailsScreen() {
   // hardcoded literal, so this screen and Reschedule read the same source. ---
   const [availability, setAvailability] = useState<HospitalAvailability | null>(null);
   const [loadingAvailability, setLoadingAvailability] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -287,10 +288,12 @@ export default function HospitalDetailsScreen() {
         <TouchableOpacity
           style={[
             styles.proceedButton,
-            (!selectedDate || !selectedTime) && styles.proceedButtonDisabled,
+            (!selectedDate || !selectedTime || submitting) && styles.proceedButtonDisabled,
           ]}
-          disabled={!selectedDate || !selectedTime}
+          disabled={!selectedDate || !selectedTime || submitting}
           onPress={async () => {
+            if (submitting) return;
+            setSubmitting(true);
             try {
               const { bookMobile } = await import('@/lib/api/discovery');
               const { getOutstanding } = await import('@/lib/api/patient');
@@ -333,12 +336,20 @@ export default function HospitalDetailsScreen() {
                   },
                 ]
               );
+              setSubmitting(false);
             } catch (e) {
+              setSubmitting(false);
               alert(e instanceof Error ? e.message : 'Booking failed');
             }
           }}>
-          <Text style={styles.proceedButtonText}>Proceed</Text>
-          <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
+          {submitting ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <Text style={styles.proceedButtonText}>Proceed</Text>
+              <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </View>
