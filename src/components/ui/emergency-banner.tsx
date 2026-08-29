@@ -1,16 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 
 export default function EmergencyBanner() {
-  const router = useRouter();
-
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      // This now routes directly to the Smart Triage screen!
-      onPress={() => router.push('/emergency-triage')}>
+      // No triage screen exists yet — the emergency affordance calls Ghana's
+      // national emergency number instead of routing to a missing page.
+      onPress={() => Linking.openURL('tel:112')}>
       <View style={styles.bannerContainer}>
         <View style={styles.headerRow}>
           <Ionicons name="warning" size={20} color="#DC2626" />
@@ -18,10 +16,10 @@ export default function EmergencyBanner() {
         </View>
 
         <Text style={styles.bodyText}>Skip the queue and get immediate attention</Text>
-        <View style={{ width: '90%', display: 'flex', flexDirection: 'row', alignItems: 'center' }} className='gap-1'>
-          <Text style={styles.actionText}>
-            Start Priority Triage
-          </Text> 
+        <View
+          style={{ width: '90%', display: 'flex', flexDirection: 'row', alignItems: 'center' }}
+          className="gap-1">
+          <Text style={styles.actionText}>Start Priority Triage</Text>
           <Ionicons name="arrow-forward" size={16} color="#DC2626" className="" />
         </View>
         <Ionicons name="medical" size={100} color="rgba(220, 38, 38, 0.05)" style={styles.bgIcon} />

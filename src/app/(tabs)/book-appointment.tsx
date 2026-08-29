@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -66,9 +66,7 @@ export default function BookAppointmentScreen() {
         <Text style={styles.headerTitle}>Book Appointment</Text>
         <Animated.View
           style={[styles.headerSideBtn, { opacity: sosOpacity, alignItems: 'flex-end' }]}>
-          <TouchableOpacity
-            style={styles.sosButton}
-            onPress={() => router.push('/emergency-triage')}>
+          <TouchableOpacity style={styles.sosButton} onPress={() => Linking.openURL('tel:112')}>
             <Ionicons name="warning" size={16} color="#DC2626" />
             <Text style={styles.sosText}>SOS</Text>
           </TouchableOpacity>
@@ -163,11 +161,6 @@ export default function BookAppointmentScreen() {
           )}
         </View>
       </Animated.ScrollView>
-
-      {/* FAB */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.9}>
-        <Ionicons name="map" size={24} color="#FFFFFF" />
-      </TouchableOpacity>
     </SafeAreaView>
   );
 }
