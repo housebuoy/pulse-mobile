@@ -112,7 +112,13 @@ export default function HospitalDetailsScreen() {
   useEffect(() => {
     let cancelled = false;
     setLoadingAvailability(true);
-    const from = currentMonth.toISOString().split('T')[0];
+    // Fetch from today (DateStrip offers today + 14 days). Previously this
+    // used the 1st of the displayed month, so the Aug 1-14 window never
+    // overlapped the selectable dates → "no available slots" (bug-triage FE-13).
+    const now = new Date();
+    const from = new Date(Math.max(currentMonth.getTime(), now.getTime()))
+      .toISOString()
+      .split('T')[0];
     const deptId = department && deptMap[department] ? deptMap[department] : department;
     import('@/lib/api/discovery').then(({ getAvailability }) =>
       getAvailability(deptId || HOSPITAL.id, from, 14).then((data) => {
