@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 
 import PaymentsHeroCard from '@/components/payments/payments-hero-card';
 import OutstandingPaymentsCard from '@/components/payments/outstanding-payments-card';
@@ -12,23 +12,34 @@ import PaymentHistoryCard from '@/components/payments/payment-history-card';
 export default function PaymentsScreen() {
   const router = useRouter();
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const { getOutstanding, getPaymentMethods, getPaymentHistory } =
-          await import('@/lib/api/patient');
-        const { usePaymentsStore } = await import('@/stores/payments-store');
-        const [outstanding, methods, history] = await Promise.all([
-          getOutstanding(),
-          getPaymentMethods(),
-          getPaymentHistory(),
-        ]);
-        usePaymentsStore.getState().hydrateFromApi({ outstanding, methods, history });
-      } catch {
-        /* keep seeds */
-      }
-    })();
-  }, []);
+  // Refetch on every focus (not just mount): returning from the Aza hosted
+  // checkout must surface the PAID flip + new history rows the webhook wrote
+  // (bug-triage FE-10).
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      void (async () => {
+        try {
+          const { getOutstanding, getPaymentMethods, getPaymentHistory } =
+            await import('@/lib/api/patient');
+          const { usePaymentsStore } = await import('@/stores/payments-store');
+          const [outstanding, methods, history] = await Promise.all([
+            getOutstanding(),
+            getPaymentMethods(),
+            getPaymentHistory(),
+          ]);
+          if (active) {
+            usePaymentsStore.getState().hydrateFromApi({ outstanding, methods, history });
+          }
+        } catch {
+          /* keep seeds */
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
