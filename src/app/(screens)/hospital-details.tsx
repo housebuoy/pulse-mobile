@@ -8,6 +8,7 @@ import {
   Dimensions,
   Animated,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -307,7 +308,31 @@ export default function HospitalDetailsScreen() {
               } catch {
                 /* ignore */
               }
-              router.replace('/(tabs)/home');
+              // Confirm the booking with a clear call-to-action instead of
+              // silently leaving the page (bug-triage FE-17).
+              const fee =
+                result && typeof result === 'object' && 'feeAmount' in result
+                  ? Number((result as { feeAmount: unknown }).feeAmount)
+                  : null;
+              const feeLine =
+                fee != null && !Number.isNaN(fee)
+                  ? `\nPay GH₵ ${fee.toFixed(2)} to secure your slot.`
+                  : '';
+              Alert.alert(
+                'Booking confirmed',
+                `Your appointment is booked for ${selectedDate}.${feeLine}`,
+                [
+                  {
+                    text: 'Later',
+                    style: 'cancel',
+                    onPress: () => router.replace('/(tabs)/home'),
+                  },
+                  {
+                    text: 'Pay Now',
+                    onPress: () => router.push('/(screens)/payments'),
+                  },
+                ]
+              );
             } catch (e) {
               alert(e instanceof Error ? e.message : 'Booking failed');
             }
