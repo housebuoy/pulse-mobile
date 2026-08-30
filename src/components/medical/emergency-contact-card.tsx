@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 import { useMedicalStore } from '@/stores/medical-store';
+import { isValidGhanaPhone, PHONE_ERROR_MESSAGE } from '@/lib/phone';
 
 export default function EmergencyContactCard() {
   const emergencyContact = useMedicalStore((state) => state.emergencyContact);
@@ -33,12 +34,17 @@ export default function EmergencyContactCard() {
   };
 
   const handleSave = () => {
+    const trimmedPhone = phone.trim();
     // Close instantly; persist in background; alert on failure (FE-29).
+    if (trimmedPhone && !isValidGhanaPhone(trimmedPhone)) {
+      Alert.alert('Invalid phone number', PHONE_ERROR_MESSAGE);
+      return;
+    }
     setModalVisible(false);
     setEmergencyContact({
       name: name.trim(),
       relationship: relationship.trim(),
-      phone: phone.trim(),
+      phone: trimmedPhone,
     }).catch(() => Alert.alert('Could not save', 'Check your connection and try again.'));
   };
 
@@ -136,6 +142,7 @@ export default function EmergencyContactCard() {
                   placeholderTextColor="#9CA3AF"
                   style={styles.input}
                   keyboardType="phone-pad"
+                  maxLength={13}
                   onSubmitEditing={handleSave}
                   returnKeyType="done"
                 />
