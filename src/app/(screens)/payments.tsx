@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   AppState,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -62,18 +63,29 @@ export default function PaymentsScreen() {
       const pending = usePaymentsStore.getState().pendingCheckoutBookingIds;
       if (pending.length > 0) {
         void (async () => {
-          for (let i = 0; i < 8; i++) {
+          let allPaid = false;
+          // Poll up to ~25s for the webhook-confirmed PAID flip.
+          for (let i = 0; i < 10; i++) {
             await new Promise((r) => setTimeout(r, 2500));
             try {
               const { getOutstanding } = await import('@/lib/api/patient');
               const outstanding = await getOutstanding();
               const stillPending = outstanding.some((b) => pending.includes(String(b.id)));
-              if (!stillPending) break; // all paid — done
+              if (!stillPending) {
+                allPaid = true; // all paid — done
+                break;
+              }
             } catch {
               /* transient network error — keep polling */
             }
           }
           await loadData();
+          if (allPaid) {
+            Alert.alert(
+              'Payment Successful 🎉',
+              'Your payment was completed and your booking is now confirmed. You can find the receipt in Payment History.'
+            );
+          }
           usePaymentsStore.getState().clearPendingCheckoutBookingIds();
         })();
       }

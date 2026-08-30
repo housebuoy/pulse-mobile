@@ -35,15 +35,16 @@ export default function PayBookingSheet({ visible, onClose, bookings }: PayBooki
   const handlePay = async () => {
     if (!selectedMethodId) return;
     try {
+      // Opens the Aza hosted checkout (Safari). NO "Checkout opened" alert here:
+      // on iOS it stays on screen while the app backgrounds, so after paying
+      // and returning the stale message was still showing (bug-triage FE-25).
+      // Success is confirmed by the webhook and surfaced by the payments
+      // screen when the app comes back to the foreground.
       await payBookings(
         bookings.map((b) => b.id),
         selectedMethodId
       );
       onClose();
-      Alert.alert(
-        'Checkout opened',
-        'Complete payment in the browser. Your bookings update after the hospital confirms.'
-      );
     } catch (e) {
       Alert.alert('Payment failed', e instanceof Error ? e.message : 'Try again');
     }
@@ -138,7 +139,13 @@ export default function PayBookingSheet({ visible, onClose, bookings }: PayBooki
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8, maxHeight: '85%' },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    maxHeight: '85%',
+  },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
