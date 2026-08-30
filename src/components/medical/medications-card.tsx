@@ -42,19 +42,15 @@ export default function MedicationsCard() {
 
   const closeModal = () => setModalVisible(false);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     const trimmedName = name.trim();
     if (!trimmedName) return;
-    try {
-      if (editing) {
-        await updateMedication(editing.id, trimmedName, dose.trim());
-      } else {
-        await addMedication(trimmedName, dose.trim());
-      }
-      closeModal();
-    } catch {
-      Alert.alert('Could not save', 'Check your connection and try again.');
-    }
+    // Close instantly; persist in background with rollback + alert (FE-29).
+    closeModal();
+    (editing
+      ? updateMedication(editing.id, trimmedName, dose.trim())
+      : addMedication(trimmedName, dose.trim())
+    ).catch(() => Alert.alert('Could not save', 'Check your connection and try again.'));
   };
 
   return (
@@ -86,12 +82,10 @@ export default function MedicationsCard() {
               {!!medication.dose && <Text style={styles.medDose}>{medication.dose}</Text>}
             </View>
             <TouchableOpacity
-              onPress={async () => {
-                try {
-                  await removeMedication(medication.id);
-                } catch {
-                  Alert.alert('Could not remove', 'Check your connection and try again.');
-                }
+              onPress={() => {
+                removeMedication(medication.id).catch(() =>
+                  Alert.alert('Could not remove', 'Check your connection and try again.')
+                );
               }}
               hitSlop={8}
               style={styles.medRemove}>
@@ -119,7 +113,7 @@ export default function MedicationsCard() {
               {/* Keyboard-safe body (bug-triage FE-27) */}
               <ScrollView
                 style={styles.sheetBody}
-                keyboardShouldPersistTaps="handled"
+                keyboardShouldPersistTaps="always"
                 showsVerticalScrollIndicator={false}>
                 <Text style={styles.inputLabel}>Name</Text>
                 <TextInput

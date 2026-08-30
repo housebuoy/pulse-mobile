@@ -50,22 +50,19 @@ export default function RecordVitalsModal({ visible, onClose }: RecordVitalsModa
     (v) => v.trim().length > 0
   );
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!hasAnyValue) return;
-    try {
-      await addVitalsEntry({
-        systolic: systolic.trim() || undefined,
-        diastolic: diastolic.trim() || undefined,
-        pulseBpm: pulseBpm.trim() || undefined,
-        temperatureC: temperatureC.trim() || undefined,
-        heightCm: heightCm.trim() || undefined,
-        weightKg: weightKg.trim() || undefined,
-      });
-      reset();
-      onClose();
-    } catch {
-      Alert.alert('Could not save', 'Check your connection and try again.');
-    }
+    // Close instantly; persist in background; alert on failure (FE-29).
+    reset();
+    onClose();
+    addVitalsEntry({
+      systolic: systolic.trim() || undefined,
+      diastolic: diastolic.trim() || undefined,
+      pulseBpm: pulseBpm.trim() || undefined,
+      temperatureC: temperatureC.trim() || undefined,
+      heightCm: heightCm.trim() || undefined,
+      weightKg: weightKg.trim() || undefined,
+    }).catch(() => Alert.alert('Could not save', 'Check your connection and try again.'));
   };
 
   return (
@@ -85,7 +82,7 @@ export default function RecordVitalsModal({ visible, onClose }: RecordVitalsModa
             {/* Keyboard-safe body (bug-triage FE-27) */}
             <ScrollView
               style={styles.sheetBody}
-              keyboardShouldPersistTaps="handled"
+              keyboardShouldPersistTaps="always"
               showsVerticalScrollIndicator={false}>
               <Text style={styles.hint}>Leave anything blank you don&apos;t want to record.</Text>
 

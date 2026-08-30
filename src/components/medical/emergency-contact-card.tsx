@@ -32,17 +32,14 @@ export default function EmergencyContactCard() {
     setModalVisible(true);
   };
 
-  const handleSave = async () => {
-    try {
-      await setEmergencyContact({
-        name: name.trim(),
-        relationship: relationship.trim(),
-        phone: phone.trim(),
-      });
-      setModalVisible(false);
-    } catch {
-      Alert.alert('Could not save', 'Check your connection and try again.');
-    }
+  const handleSave = () => {
+    // Close instantly; persist in background; alert on failure (FE-29).
+    setModalVisible(false);
+    setEmergencyContact({
+      name: name.trim(),
+      relationship: relationship.trim(),
+      phone: phone.trim(),
+    }).catch(() => Alert.alert('Could not save', 'Check your connection and try again.'));
   };
 
   const hasContact = emergencyContact.name || emergencyContact.phone;
@@ -110,7 +107,7 @@ export default function EmergencyContactCard() {
               {/* Keyboard-safe body (bug-triage FE-27) */}
               <ScrollView
                 style={styles.sheetBody}
-                keyboardShouldPersistTaps="handled"
+                keyboardShouldPersistTaps="always"
                 showsVerticalScrollIndicator={false}>
                 <Text style={styles.inputLabel}>Name</Text>
                 <TextInput

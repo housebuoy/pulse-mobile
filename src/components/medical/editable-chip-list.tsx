@@ -32,7 +32,7 @@ interface EditableChipListProps {
   iconColor: string;
   items: ChipItem[];
   typeOptions?: ChipTypeOption[];
-  onAdd: (label: string, type?: string) => void;
+  onAdd: (label: string, type?: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   addLabel: string;
   inputPlaceholder: string;
@@ -70,15 +70,16 @@ export default function EditableChipList({
     setSelectedType(typeOptions?.[0]?.value);
   };
 
-  const handleAdd = async () => {
+  const handleAdd = () => {
     const trimmed = label.trim();
     if (!trimmed) return;
-    try {
-      await onAdd(trimmed, selectedType);
-      closeModal();
-    } catch {
-      Alert.alert('Could not save', 'Check your connection and try again.');
-    }
+    // Close instantly (optimistic) — the persist runs in the background and
+    // rolls back + alerts on failure (bug-triage FE-29). Awaiting the network
+    // here made the modal linger for seconds.
+    closeModal();
+    onAdd(trimmed, selectedType).catch(() =>
+      Alert.alert('Could not save', 'Check your connection and try again.')
+    );
   };
 
   return (
@@ -114,12 +115,10 @@ export default function EditableChipList({
                 )}
               </View>
               <TouchableOpacity
-                onPress={async () => {
-                  try {
-                    await onRemove(item.id);
-                  } catch {
-                    Alert.alert('Could not remove', 'Check your connection and try again.');
-                  }
+                onPress={() => {
+                  onRemove(item.id).catch(() =>
+                    Alert.alert('Could not remove', 'Check your connection and try again.')
+                  );
                 }}
                 hitSlop={8}
                 style={styles.chipRemove}>
@@ -146,7 +145,7 @@ export default function EditableChipList({
 
               <ScrollView
                 style={styles.sheetBody}
-                keyboardShouldPersistTaps="handled"
+                keyboardShouldPersistTaps="always"
                 showsVerticalScrollIndicator={false}>
                 {typeOptions && (
                   <View style={styles.typeRow}>

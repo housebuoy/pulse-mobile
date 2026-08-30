@@ -9,6 +9,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
@@ -70,7 +71,9 @@ export default function InsuranceDetailsCard() {
     };
     setInsuranceDetails(details);
     setModalVisible(false);
-    void import('@/lib/api/patient').then(({ putInsurance }) => putInsurance(details));
+    void import('@/lib/api/patient')
+      .then(({ putInsurance }) => putInsurance(details))
+      .catch(() => Alert.alert('Could not save', 'Check your connection and try again.'));
   };
 
   return (
@@ -116,7 +119,7 @@ export default function InsuranceDetailsCard() {
 
               <ScrollView
                 style={styles.sheetBody}
-                keyboardShouldPersistTaps="handled"
+                keyboardShouldPersistTaps="always"
                 showsVerticalScrollIndicator={false}>
                 <Text style={styles.inputLabel}>Scheme</Text>
                 <View style={styles.schemeGrid}>
