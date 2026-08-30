@@ -1,5 +1,13 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  AppState,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -37,6 +45,17 @@ export default function PaymentsScreen() {
       void loadData();
     }, [loadData])
   );
+
+  // Returning from the Aza checkout (Safari) backgrounds the app — navigation
+  // focus does NOT re-fire, so also refetch when the app comes back to the
+  // foreground (FE-21). This is what makes payment status appear without a
+  // manual refresh.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void loadData();
+    });
+    return () => sub.remove();
+  }, [loadData]);
 
   // Pull-to-refresh (FE-20) — same loader, manual trigger.
   const onRefresh = useCallback(() => {
