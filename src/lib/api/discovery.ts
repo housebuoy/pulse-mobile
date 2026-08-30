@@ -26,6 +26,8 @@ export interface DepartmentOption {
   name: string;
   consultationFee: number;
   description: string;
+  /** False when the department has no doctors — booking is impossible (backend flag). */
+  hasDoctors?: boolean;
 }
 
 /** Wire slot time is ISO "09:00"; screens display "09:00 AM". */

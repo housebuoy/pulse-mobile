@@ -82,6 +82,7 @@ export default function HospitalDetailsScreen() {
 
   const [deptOptions, setDeptOptions] = useState<DropdownOption[]>([]);
   const [deptMap, setDeptMap] = useState<Record<string, number>>({});
+  const [deptDoctors, setDeptDoctors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setFacility(HOSPITAL.name, HOSPITAL.location, HOSPITAL.id);
@@ -92,10 +93,13 @@ export default function HospitalDetailsScreen() {
       listDepartments(HOSPITAL.id).then((rows: DepartmentOption[]) => {
         setDeptOptions(rows.map((d) => ({ label: d.name, value: String(d.id) })));
         const map: Record<string, number> = {};
+        const doctors: Record<string, boolean> = {};
         rows.forEach((d) => {
           map[String(d.id)] = d.id;
+          doctors[String(d.id)] = d.hasDoctors !== false;
         });
         setDeptMap(map);
+        setDeptDoctors(doctors);
       })
     );
   }, [HOSPITAL.id]);
@@ -269,17 +273,32 @@ export default function HospitalDetailsScreen() {
             Available Slots
           </Text>
 
-          {loadingAvailability ? (
-            <View style={styles.loadingSlots}>
-              <ActivityIndicator color={COLORS.primary} />
-            </View>
-          ) : (
-            <TimeSlotPicker
-              slots={flatSlots}
-              selectedTime={selectedTime}
-              onSelectTime={setSelectedTime}
-            />
-          )}
+          {(() => {
+            const deptKey = department ? String(deptMap[department] ?? department) : null;
+            const deptHasDoctors = deptKey ? (deptDoctors[deptKey] ?? true) : true;
+            if (!deptHasDoctors) {
+              return (
+                <View style={styles.noDoctorsBox}>
+                  <Ionicons name="medkit-outline" size={22} color="#9CA3AF" />
+                  <Text style={styles.noDoctorsText}>
+                    No doctors are available for this department right now. Please try another
+                    department.
+                  </Text>
+                </View>
+              );
+            }
+            return loadingAvailability ? (
+              <View style={styles.loadingSlots}>
+                <ActivityIndicator color={COLORS.primary} />
+              </View>
+            ) : (
+              <TimeSlotPicker
+                slots={flatSlots}
+                selectedTime={selectedTime}
+                onSelectTime={setSelectedTime}
+              />
+            );
+          })()}
         </View>
       </Animated.ScrollView>
 
@@ -550,6 +569,23 @@ const styles = StyleSheet.create({
 
   // Time Slots (Reused logic)
   loadingSlots: { paddingVertical: 40, alignItems: 'center' },
+  noDoctorsBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+  },
+  noDoctorsText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#6B7280',
+  },
   timeGroup: { marginBottom: 20 },
   periodLabel: {
     fontSize: 12,
