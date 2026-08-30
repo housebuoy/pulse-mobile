@@ -63,24 +63,33 @@ export default function PaymentsScreen() {
       const pending = usePaymentsStore.getState().pendingCheckoutBookingIds;
       if (pending.length > 0) {
         void (async () => {
-          let allPaid = false;
-          // Poll up to ~25s for the webhook-confirmed PAID flip.
-          for (let i = 0; i < 10; i++) {
+          // FE-25: the success alert must appear AT THE SAME MOMENT the paid
+          // booking leaves "outstanding" — check immediately on return (the
+          // webhook may already have landed), and only poll if still pending.
+          const { getOutstanding } = await import('@/lib/api/patient');
+          const allPaid = async () => {
+            const outstanding = await getOutstanding();
+            return !outstanding.some((b) => pending.includes(String(b.id)));
+          };
+
+          let paid = false;
+          try {
+            paid = await allPaid();
+          } catch {
+            /* keep polling below */
+          }
+          for (let i = 0; !paid && i < 10; i++) {
             await new Promise((r) => setTimeout(r, 2500));
             try {
-              const { getOutstanding } = await import('@/lib/api/patient');
-              const outstanding = await getOutstanding();
-              const stillPending = outstanding.some((b) => pending.includes(String(b.id)));
-              if (!stillPending) {
-                allPaid = true; // all paid — done
-                break;
-              }
+              paid = await allPaid();
             } catch {
               /* transient network error — keep polling */
             }
           }
+          // Refresh the screen (moves paid items to history), then surface the
+          // confirmation — alert fires in sync with the list update.
           await loadData();
-          if (allPaid) {
+          if (paid) {
             Alert.alert(
               'Payment Successful 🎉',
               'Your payment was completed and your booking is now confirmed. You can find the receipt in Payment History.'
