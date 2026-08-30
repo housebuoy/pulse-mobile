@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  Linking,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 import { useMedicalStore } from '@/stores/medical-store';
@@ -21,7 +32,11 @@ export default function EmergencyContactCard() {
   };
 
   const handleSave = () => {
-    setEmergencyContact({ name: name.trim(), relationship: relationship.trim(), phone: phone.trim() });
+    setEmergencyContact({
+      name: name.trim(),
+      relationship: relationship.trim(),
+      phone: phone.trim(),
+    });
     setModalVisible(false);
   };
 
@@ -76,51 +91,59 @@ export default function EmergencyContactCard() {
           style={styles.backdrop}
           activeOpacity={1}
           onPress={() => setModalVisible(false)}>
-          <View style={styles.sheet} onStartShouldSetResponder={() => true}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>EMERGENCY CONTACT</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={20} color="#6B7280" />
-              </TouchableOpacity>
+          <KeyboardAvoidingView
+            style={{ flex: 1, justifyContent: 'flex-end' }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>EMERGENCY CONTACT</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <Ionicons name="close" size={20} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Keyboard-safe body (bug-triage FE-27) */}
+              <ScrollView
+                style={styles.sheetBody}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}>
+                <Text style={styles.inputLabel}>Name</Text>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="e.g. Ama Quarcoo"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                  autoFocus
+                />
+
+                <Text style={styles.inputLabel}>Relationship</Text>
+                <TextInput
+                  value={relationship}
+                  onChangeText={setRelationship}
+                  placeholder="e.g. Sister"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                />
+
+                <Text style={styles.inputLabel}>Phone</Text>
+                <TextInput
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="e.g. +233 20 987 6543"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                  keyboardType="phone-pad"
+                  onSubmitEditing={handleSave}
+                  returnKeyType="done"
+                />
+
+                <TouchableOpacity style={styles.confirmButton} onPress={handleSave}>
+                  <Text style={styles.confirmButtonText}>Save</Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
-
-            <View style={styles.sheetBody}>
-              <Text style={styles.inputLabel}>Name</Text>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder="e.g. Ama Quarcoo"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                autoFocus
-              />
-
-              <Text style={styles.inputLabel}>Relationship</Text>
-              <TextInput
-                value={relationship}
-                onChangeText={setRelationship}
-                placeholder="e.g. Sister"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-              />
-
-              <Text style={styles.inputLabel}>Phone</Text>
-              <TextInput
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="e.g. +233 20 987 6543"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                keyboardType="phone-pad"
-                onSubmitEditing={handleSave}
-                returnKeyType="done"
-              />
-
-              <TouchableOpacity style={styles.confirmButton} onPress={handleSave}>
-                <Text style={styles.confirmButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -171,7 +194,12 @@ const styles = StyleSheet.create({
   },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8 },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+  },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -10,8 +10,7 @@ import MedicationsCard from '@/components/medical/medications-card';
 import EmergencyContactCard from '@/components/medical/emergency-contact-card';
 import VitalsLogCard from '@/components/medical/vitals-log-card';
 import { useMedicalStore } from '@/stores/medical-store';
-
-const PATIENT_NAME = 'Kelvin Quarcoo';
+import { useProfileStore } from '@/stores/profile-store';
 
 const ALLERGY_TYPE_OPTIONS = [
   { value: 'drug', label: 'Drug' },
@@ -21,6 +20,9 @@ const ALLERGY_TYPE_OPTIONS = [
 
 export default function MedicalIdScreen() {
   const router = useRouter();
+  // Real patient identity from the profile store (hydrated after login) —
+  // previously a hardcoded mock name showed here (bug-triage FE-27).
+  const identity = useProfileStore((state) => state.identity);
 
   const allergies = useMedicalStore((state) => state.allergies);
   const addAllergy = useMedicalStore((state) => state.addAllergy);
@@ -41,7 +43,9 @@ export default function MedicalIdScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <EmergencyIdCard patientName={PATIENT_NAME} />
+        <EmergencyIdCard
+          patientName={identity ? `${identity.firstName} ${identity.lastName}`.trim() : ''}
+        />
 
         <EditableChipList
           title="ALLERGIES"
@@ -50,7 +54,9 @@ export default function MedicalIdScreen() {
           iconColor="#DC2626"
           items={allergies}
           typeOptions={ALLERGY_TYPE_OPTIONS}
-          onAdd={(label, type) => addAllergy(label, (type as 'drug' | 'food' | 'environmental') ?? 'drug')}
+          onAdd={(label, type) =>
+            addAllergy(label, (type as 'drug' | 'food' | 'environmental') ?? 'drug')
+          }
           onRemove={removeAllergy}
           addLabel="Add"
           inputPlaceholder="e.g. Penicillin"

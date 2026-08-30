@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 
@@ -75,7 +85,10 @@ export default function EditableChipList({
           </View>
           <Text style={styles.title}>{title}</Text>
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setModalVisible(true)}
+          activeOpacity={0.7}>
           <Ionicons name="add" size={16} color={COLORS.primary} />
           <Text style={styles.addButtonText}>{addLabel}</Text>
         </TouchableOpacity>
@@ -95,7 +108,10 @@ export default function EditableChipList({
                   </Text>
                 )}
               </View>
-              <TouchableOpacity onPress={() => onRemove(item.id)} hitSlop={8} style={styles.chipRemove}>
+              <TouchableOpacity
+                onPress={() => onRemove(item.id)}
+                hitSlop={8}
+                style={styles.chipRemove}>
                 <Ionicons name="close" size={14} color={danger ? COLORS.danger : '#6B7280'} />
               </TouchableOpacity>
             </View>
@@ -105,52 +121,60 @@ export default function EditableChipList({
 
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={closeModal}>
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={closeModal}>
-          <View style={styles.sheet} onStartShouldSetResponder={() => true}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Add {title.replace(/s$/, '')}</Text>
-              <TouchableOpacity onPress={closeModal}>
-                <Ionicons name="close" size={20} color="#6B7280" />
-              </TouchableOpacity>
+          {/* KAV + ScrollView so the keyboard never covers the input (bug-triage FE-27) */}
+          <KeyboardAvoidingView
+            style={{ flex: 1, justifyContent: 'flex-end' }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Add {title.replace(/s$/, '')}</Text>
+                <TouchableOpacity onPress={closeModal}>
+                  <Ionicons name="close" size={20} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                style={styles.sheetBody}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}>
+                {typeOptions && (
+                  <View style={styles.typeRow}>
+                    {typeOptions.map((opt) => {
+                      const active = selectedType === opt.value;
+                      return (
+                        <TouchableOpacity
+                          key={opt.value}
+                          style={[styles.typePill, active && styles.typePillActive]}
+                          onPress={() => setSelectedType(opt.value)}>
+                          <Text style={[styles.typePillText, active && styles.typePillTextActive]}>
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
+                <TextInput
+                  value={label}
+                  onChangeText={setLabel}
+                  placeholder={inputPlaceholder}
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                  autoFocus
+                  onSubmitEditing={handleAdd}
+                  returnKeyType="done"
+                />
+
+                <TouchableOpacity
+                  style={[styles.confirmButton, !label.trim() && styles.confirmButtonDisabled]}
+                  disabled={!label.trim()}
+                  onPress={handleAdd}>
+                  <Text style={styles.confirmButtonText}>Add</Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
-
-            <View style={styles.sheetBody}>
-              {typeOptions && (
-                <View style={styles.typeRow}>
-                  {typeOptions.map((opt) => {
-                    const active = selectedType === opt.value;
-                    return (
-                      <TouchableOpacity
-                        key={opt.value}
-                        style={[styles.typePill, active && styles.typePillActive]}
-                        onPress={() => setSelectedType(opt.value)}>
-                        <Text style={[styles.typePillText, active && styles.typePillTextActive]}>
-                          {opt.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-
-              <TextInput
-                value={label}
-                onChangeText={setLabel}
-                placeholder={inputPlaceholder}
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                autoFocus
-                onSubmitEditing={handleAdd}
-                returnKeyType="done"
-              />
-
-              <TouchableOpacity
-                style={[styles.confirmButton, !label.trim() && styles.confirmButtonDisabled]}
-                disabled={!label.trim()}
-                onPress={handleAdd}>
-                <Text style={styles.confirmButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -206,7 +230,12 @@ const styles = StyleSheet.create({
 
   // Add modal
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8 },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+  },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
