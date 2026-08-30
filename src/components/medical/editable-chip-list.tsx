@@ -175,14 +175,19 @@ export default function EditableChipList({
                   onSubmitEditing={handleAdd}
                   returnKeyType="done"
                 />
+              </ScrollView>
 
+              {/* Fixed footer: the Add button lives OUTSIDE the ScrollView so
+                  iOS keyboard dismissal can never swallow its first tap
+                  (bug-triage FE-31) — same handler as the keyboard check key. */}
+              <View style={styles.sheetFooter}>
                 <TouchableOpacity
                   style={[styles.confirmButton, !label.trim() && styles.confirmButtonDisabled]}
                   disabled={!label.trim()}
                   onPress={handleAdd}>
                   <Text style={styles.confirmButtonText}>Add</Text>
                 </TouchableOpacity>
-              </ScrollView>
+              </View>
             </View>
           </KeyboardAvoidingView>
         </TouchableOpacity>
@@ -245,6 +250,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 8,
+    maxHeight: '85%',
   },
   sheetHeader: {
     flexDirection: 'row',
@@ -256,7 +262,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
+  sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, flexShrink: 1 },
+  sheetFooter: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
   typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   typePill: {
     paddingVertical: 8,

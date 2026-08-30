@@ -146,11 +146,15 @@ export default function EmergencyContactCard() {
                   onSubmitEditing={handleSave}
                   returnKeyType="done"
                 />
+              </ScrollView>
 
+              {/* Fixed footer — button outside the ScrollView so the first tap
+                  is never swallowed by keyboard dismissal (bug-triage FE-31). */}
+              <View style={styles.sheetFooter}>
                 <TouchableOpacity style={styles.confirmButton} onPress={handleSave}>
                   <Text style={styles.confirmButtonText}>Save</Text>
                 </TouchableOpacity>
-              </ScrollView>
+              </View>
             </View>
           </KeyboardAvoidingView>
         </TouchableOpacity>
@@ -208,6 +212,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 8,
+    maxHeight: '85%',
   },
   sheetHeader: {
     flexDirection: 'row',
@@ -219,7 +224,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
+  sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, flexShrink: 1 },
+  sheetFooter: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
   inputLabel: {
     fontSize: 11,
     fontWeight: '600',

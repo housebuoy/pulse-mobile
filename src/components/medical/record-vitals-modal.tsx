@@ -150,14 +150,17 @@ export default function RecordVitalsModal({ visible, onClose }: RecordVitalsModa
                   />
                 </View>
               </View>
-
+            </ScrollView>
+            {/* Fixed footer — button outside the ScrollView so the first tap
+                  is never swallowed by keyboard dismissal (bug-triage FE-31). */}
+            <View style={styles.sheetFooter}>
               <TouchableOpacity
                 style={[styles.confirmButton, !hasAnyValue && styles.confirmButtonDisabled]}
                 disabled={!hasAnyValue}
                 onPress={handleSave}>
                 <Text style={styles.confirmButtonText}>Save Entry</Text>
               </TouchableOpacity>
-            </ScrollView>
+            </View>
           </View>
         </KeyboardAvoidingView>
       </TouchableOpacity>
@@ -184,7 +187,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  sheetBody: { paddingHorizontal: 20, paddingTop: 16 },
+  sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, flexShrink: 1 },
+  sheetFooter: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
   hint: { fontSize: 13, color: '#9CA3AF', marginBottom: 16 },
   row: { flexDirection: 'row', gap: 12 },
   rowInput: { flex: 1 },
