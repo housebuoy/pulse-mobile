@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
@@ -32,7 +33,7 @@ interface EditableChipListProps {
   items: ChipItem[];
   typeOptions?: ChipTypeOption[];
   onAdd: (label: string, type?: string) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string) => Promise<void>;
   addLabel: string;
   inputPlaceholder: string;
   emptyText: string;
@@ -69,11 +70,15 @@ export default function EditableChipList({
     setSelectedType(typeOptions?.[0]?.value);
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const trimmed = label.trim();
     if (!trimmed) return;
-    onAdd(trimmed, selectedType);
-    closeModal();
+    try {
+      await onAdd(trimmed, selectedType);
+      closeModal();
+    } catch {
+      Alert.alert('Could not save', 'Check your connection and try again.');
+    }
   };
 
   return (
@@ -109,7 +114,13 @@ export default function EditableChipList({
                 )}
               </View>
               <TouchableOpacity
-                onPress={() => onRemove(item.id)}
+                onPress={async () => {
+                  try {
+                    await onRemove(item.id);
+                  } catch {
+                    Alert.alert('Could not remove', 'Check your connection and try again.');
+                  }
+                }}
                 hitSlop={8}
                 style={styles.chipRemove}>
                 <Ionicons name="close" size={14} color={danger ? COLORS.danger : '#6B7280'} />

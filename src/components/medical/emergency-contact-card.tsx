@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
@@ -31,13 +32,17 @@ export default function EmergencyContactCard() {
     setModalVisible(true);
   };
 
-  const handleSave = () => {
-    setEmergencyContact({
-      name: name.trim(),
-      relationship: relationship.trim(),
-      phone: phone.trim(),
-    });
-    setModalVisible(false);
+  const handleSave = async () => {
+    try {
+      await setEmergencyContact({
+        name: name.trim(),
+        relationship: relationship.trim(),
+        phone: phone.trim(),
+      });
+      setModalVisible(false);
+    } catch {
+      Alert.alert('Could not save', 'Check your connection and try again.');
+    }
   };
 
   const hasContact = emergencyContact.name || emergencyContact.phone;

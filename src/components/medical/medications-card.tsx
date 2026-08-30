@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
@@ -41,15 +42,19 @@ export default function MedicationsCard() {
 
   const closeModal = () => setModalVisible(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmedName = name.trim();
     if (!trimmedName) return;
-    if (editing) {
-      updateMedication(editing.id, trimmedName, dose.trim());
-    } else {
-      addMedication(trimmedName, dose.trim());
+    try {
+      if (editing) {
+        await updateMedication(editing.id, trimmedName, dose.trim());
+      } else {
+        await addMedication(trimmedName, dose.trim());
+      }
+      closeModal();
+    } catch {
+      Alert.alert('Could not save', 'Check your connection and try again.');
     }
-    closeModal();
   };
 
   return (
@@ -81,7 +86,13 @@ export default function MedicationsCard() {
               {!!medication.dose && <Text style={styles.medDose}>{medication.dose}</Text>}
             </View>
             <TouchableOpacity
-              onPress={() => removeMedication(medication.id)}
+              onPress={async () => {
+                try {
+                  await removeMedication(medication.id);
+                } catch {
+                  Alert.alert('Could not remove', 'Check your connection and try again.');
+                }
+              }}
               hitSlop={8}
               style={styles.medRemove}>
               <Ionicons name="close" size={16} color="#9CA3AF" />

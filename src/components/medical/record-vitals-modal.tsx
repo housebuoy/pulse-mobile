@@ -9,6 +9,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
@@ -49,18 +50,22 @@ export default function RecordVitalsModal({ visible, onClose }: RecordVitalsModa
     (v) => v.trim().length > 0
   );
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!hasAnyValue) return;
-    addVitalsEntry({
-      systolic: systolic.trim() || undefined,
-      diastolic: diastolic.trim() || undefined,
-      pulseBpm: pulseBpm.trim() || undefined,
-      temperatureC: temperatureC.trim() || undefined,
-      heightCm: heightCm.trim() || undefined,
-      weightKg: weightKg.trim() || undefined,
-    });
-    reset();
-    onClose();
+    try {
+      await addVitalsEntry({
+        systolic: systolic.trim() || undefined,
+        diastolic: diastolic.trim() || undefined,
+        pulseBpm: pulseBpm.trim() || undefined,
+        temperatureC: temperatureC.trim() || undefined,
+        heightCm: heightCm.trim() || undefined,
+        weightKg: weightKg.trim() || undefined,
+      });
+      reset();
+      onClose();
+    } catch {
+      Alert.alert('Could not save', 'Check your connection and try again.');
+    }
   };
 
   return (

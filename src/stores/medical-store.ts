@@ -48,21 +48,21 @@ interface MedicalState {
   emergencyContact: EmergencyContact;
   vitals: VitalsEntry[];
 
-  setBloodGroup: (bloodGroup: string) => void;
+  setBloodGroup: (bloodGroup: string) => Promise<void>;
 
-  addAllergy: (label: string, type: AllergyType) => void;
-  removeAllergy: (id: string) => void;
+  addAllergy: (label: string, type: AllergyType) => Promise<void>;
+  removeAllergy: (id: string) => Promise<void>;
 
-  addCondition: (label: string) => void;
-  removeCondition: (id: string) => void;
+  addCondition: (label: string) => Promise<void>;
+  removeCondition: (id: string) => Promise<void>;
 
-  addMedication: (name: string, dose: string) => void;
-  updateMedication: (id: string, name: string, dose: string) => void;
-  removeMedication: (id: string) => void;
+  addMedication: (name: string, dose: string) => Promise<void>;
+  updateMedication: (id: string, name: string, dose: string) => Promise<void>;
+  removeMedication: (id: string) => Promise<void>;
 
-  setEmergencyContact: (contact: EmergencyContact) => void;
+  setEmergencyContact: (contact: EmergencyContact) => Promise<void>;
 
-  addVitalsEntry: (entry: Omit<VitalsEntry, 'id' | 'date'>) => void;
+  addVitalsEntry: (entry: Omit<VitalsEntry, 'id' | 'date'>) => Promise<void>;
   removeVitalsEntry: (id: string) => void;
 
   hydrateFromApi: (data: {
@@ -78,11 +78,12 @@ interface MedicalState {
 const makeId = () => `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
 const todayIso = () => new Date().toISOString().split('T')[0];
 
+/** Persist the full medical profile to the backend; returns the server copy. */
 async function persistMedical() {
   const { useMedicalStore: store } = await import('@/stores/medical-store');
   const s = store.getState();
   const { patchMedical } = await import('@/lib/api/patient');
-  await patchMedical({
+  return patchMedical({
     bloodGroup: s.bloodGroup,
     allergies: s.allergies,
     conditions: s.conditions,
@@ -94,11 +95,13 @@ async function persistMedical() {
 // matching how the queue/profile stores ship with a demo record.
 export const useMedicalStore = create<MedicalState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       bloodGroup: 'O+',
       allergies: [{ id: 'seed-allergy-1', label: 'Penicillin', type: 'drug' }],
       conditions: [{ id: 'seed-condition-1', label: 'Asthma' }],
-      medications: [{ id: 'seed-medication-1', name: 'Ventolin Inhaler', dose: '100mcg, as needed' }],
+      medications: [
+        { id: 'seed-medication-1', name: 'Ventolin Inhaler', dose: '100mcg, as needed' },
+      ],
       emergencyContact: {
         name: 'Ama Quarcoo',
         relationship: 'Sister',
@@ -117,62 +120,126 @@ export const useMedicalStore = create<MedicalState>()(
         },
       ],
 
-      setBloodGroup: (bloodGroup) => {
+      setBloodGroup: async (bloodGroup) => {
+        const prev = get().bloodGroup;
         set({ bloodGroup });
-        void persistMedical();
+        try {
+          await persistMedical();
+        } catch (e) {
+          set({ bloodGroup: prev });
+          throw e;
+        }
       },
 
-      addAllergy: (label, type) => {
-        set((state) => ({
-          allergies: [...state.allergies, { id: makeId(), label, type }],
-        }));
-        void persistMedical();
+      addAllergy: async (label, type) => {
+        const prev = get().allergies;
+        set((state) => ({ allergies: [...state.allergies, { id: makeId(), label, type }] }));
+        try {
+          const updated = await persistMedical();
+          if (updated.allergies) set({ allergies: updated.allergies });
+        } catch (e) {
+          set({ allergies: prev });
+          throw e;
+        }
       },
-      removeAllergy: (id) => {
+      removeAllergy: async (id) => {
+        const prev = get().allergies;
         set((state) => ({ allergies: state.allergies.filter((a) => a.id !== id) }));
-        void persistMedical();
+        try {
+          const updated = await persistMedical();
+          if (updated.allergies) set({ allergies: updated.allergies });
+        } catch (e) {
+          set({ allergies: prev });
+          throw e;
+        }
       },
 
-      addCondition: (label) => {
-        set((state) => ({
-          conditions: [...state.conditions, { id: makeId(), label }],
-        }));
-        void persistMedical();
+      addCondition: async (label) => {
+        const prev = get().conditions;
+        set((state) => ({ conditions: [...state.conditions, { id: makeId(), label }] }));
+        try {
+          const updated = await persistMedical();
+          if (updated.conditions) set({ conditions: updated.conditions });
+        } catch (e) {
+          set({ conditions: prev });
+          throw e;
+        }
       },
-      removeCondition: (id) => {
+      removeCondition: async (id) => {
+        const prev = get().conditions;
         set((state) => ({ conditions: state.conditions.filter((c) => c.id !== id) }));
-        void persistMedical();
+        try {
+          const updated = await persistMedical();
+          if (updated.conditions) set({ conditions: updated.conditions });
+        } catch (e) {
+          set({ conditions: prev });
+          throw e;
+        }
       },
 
-      addMedication: (name, dose) => {
+      addMedication: async (name, dose) => {
+        const prev = get().medications;
         set((state) => ({
           medications: [...state.medications, { id: makeId(), name, dose }],
         }));
-        void persistMedical();
+        try {
+          const updated = await persistMedical();
+          if (updated.medications) set({ medications: updated.medications });
+        } catch (e) {
+          set({ medications: prev });
+          throw e;
+        }
       },
-      updateMedication: (id, name, dose) => {
+      updateMedication: async (id, name, dose) => {
+        const prev = get().medications;
         set((state) => ({
           medications: state.medications.map((m) => (m.id === id ? { ...m, name, dose } : m)),
         }));
-        void persistMedical();
+        try {
+          const updated = await persistMedical();
+          if (updated.medications) set({ medications: updated.medications });
+        } catch (e) {
+          set({ medications: prev });
+          throw e;
+        }
       },
-      removeMedication: (id) => {
+      removeMedication: async (id) => {
+        const prev = get().medications;
         set((state) => ({ medications: state.medications.filter((m) => m.id !== id) }));
-        void persistMedical();
+        try {
+          const updated = await persistMedical();
+          if (updated.medications) set({ medications: updated.medications });
+        } catch (e) {
+          set({ medications: prev });
+          throw e;
+        }
       },
 
-      setEmergencyContact: (emergencyContact) => {
+      setEmergencyContact: async (emergencyContact) => {
+        const prev = get().emergencyContact;
         set({ emergencyContact });
-        void import('@/lib/api/patient').then(({ patchProfile }) =>
-          patchProfile({ emergencyContact })
-        );
+        try {
+          const { patchProfile } = await import('@/lib/api/patient');
+          await patchProfile({ emergencyContact });
+        } catch (e) {
+          set({ emergencyContact: prev });
+          throw e;
+        }
       },
 
-      addVitalsEntry: (entry) => {
+      addVitalsEntry: async (entry) => {
+        const prev = get().vitals;
         set((state) => ({
           vitals: [{ id: makeId(), date: todayIso(), ...entry }, ...state.vitals],
         }));
-        void import('@/lib/api/patient').then(({ addVitals }) => addVitals(entry));
+        try {
+          const { addVitals } = await import('@/lib/api/patient');
+          const updated = await addVitals(entry);
+          if (updated.vitals) set({ vitals: updated.vitals });
+        } catch (e) {
+          set({ vitals: prev });
+          throw e;
+        }
       },
       removeVitalsEntry: (id) =>
         set((state) => ({ vitals: state.vitals.filter((v) => v.id !== id) })),
