@@ -52,6 +52,13 @@ interface PaymentsState {
   paymentMethods: PaymentMethod[];
   paymentHistory: PaymentHistoryEntry[];
 
+  /** Booking ids sent to the Aza checkout that haven't confirmed PAID yet
+   *  (webhook race — FE-24). The payments screen polls on foreground until
+   *  these disappear from outstanding. */
+  pendingCheckoutBookingIds: string[];
+  setPendingCheckoutBookingIds: (ids: string[]) => void;
+  clearPendingCheckoutBookingIds: () => void;
+
   addPaymentMethod: (network: PaymentNetwork, last4: string, brand?: string) => void;
   setDefaultPaymentMethod: (id: string) => void;
   removePaymentMethod: (id: string) => void;
@@ -124,6 +131,10 @@ export const usePaymentsStore = create<PaymentsState>()(
           amount: 20,
         },
       ],
+      pendingCheckoutBookingIds: [],
+
+      setPendingCheckoutBookingIds: (ids) => set({ pendingCheckoutBookingIds: ids }),
+      clearPendingCheckoutBookingIds: () => set({ pendingCheckoutBookingIds: [] }),
 
       addPaymentMethod: (network, last4, brand) =>
         set((state) => {
@@ -168,8 +179,12 @@ export const usePaymentsStore = create<PaymentsState>()(
         // dynamic `await import('react-native')` here crashed the app in
         // Expo Go (Metro's importAll eagerly initializes PushNotificationIOS,
         // whose native module is missing) — bug-triage FE-8.
+        const bookingIdStrs = bookingIds.map(String);
         const { checkoutUrl } = await startCheckout(bookingIds, methodId);
         if (checkoutUrl) {
+          // Remember what we're waiting on so the screen can poll for the
+          // webhook-confirmed PAID flip after returning from the checkout.
+          get().setPendingCheckoutBookingIds(bookingIdStrs);
           await Linking.openURL(checkoutUrl);
         }
         try {

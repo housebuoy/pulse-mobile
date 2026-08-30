@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { usePaymentsStore } from '@/stores/payments-store';
 
 import PaymentsHeroCard from '@/components/payments/payments-hero-card';
 import OutstandingPaymentsCard from '@/components/payments/outstanding-payments-card';
@@ -52,7 +53,30 @@ export default function PaymentsScreen() {
   // manual refresh.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void loadData();
+      if (state !== 'active') return;
+      void loadData();
+      // FE-24: the webhook usually lands a couple of seconds AFTER the
+      // foreground refetch above, so a single refetch often grabs stale data.
+      // When a checkout is in flight, poll until those bookings leave
+      // "outstanding" (webhook-confirmed PAID) or a short timeout passes.
+      const pending = usePaymentsStore.getState().pendingCheckoutBookingIds;
+      if (pending.length > 0) {
+        void (async () => {
+          for (let i = 0; i < 8; i++) {
+            await new Promise((r) => setTimeout(r, 2500));
+            try {
+              const { getOutstanding } = await import('@/lib/api/patient');
+              const outstanding = await getOutstanding();
+              const stillPending = outstanding.some((b) => pending.includes(String(b.id)));
+              if (!stillPending) break; // all paid — done
+            } catch {
+              /* transient network error — keep polling */
+            }
+          }
+          await loadData();
+          usePaymentsStore.getState().clearPendingCheckoutBookingIds();
+        })();
+      }
     });
     return () => sub.remove();
   }, [loadData]);
