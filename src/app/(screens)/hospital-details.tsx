@@ -85,6 +85,10 @@ export default function HospitalDetailsScreen() {
   const [deptDoctors, setDeptDoctors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    // Fresh booking session per hospital: the store persists in AsyncStorage,
+    // so a stale department/date from a previous hospital (e.g. Korle Bu) could
+    // otherwise leak into a KNUST booking → wrong hospital + wrong fee (FE-23).
+    useBookingStore.getState().reset();
     setFacility(HOSPITAL.name, HOSPITAL.location, HOSPITAL.id);
   }, [setFacility, HOSPITAL.name, HOSPITAL.location, HOSPITAL.id]);
 
@@ -126,13 +130,25 @@ export default function HospitalDetailsScreen() {
       .toISOString()
       .split('T')[0];
     const deptId = department && deptMap[department] ? deptMap[department] : department;
+    // No department selected yet — don't fetch (HOSPITAL.id is not a valid
+    // department id; fetching it 400s and leaves the spinner stuck).
+    if (!deptId) {
+      setLoadingAvailability(false);
+      return () => {
+        cancelled = true;
+      };
+    }
     import('@/lib/api/discovery').then(({ getAvailability }) =>
-      getAvailability(deptId || HOSPITAL.id, from, 14).then((data) => {
-        if (!cancelled) {
-          setAvailability(data);
-          setLoadingAvailability(false);
-        }
-      })
+      getAvailability(deptId, from, 14)
+        .then((data) => {
+          if (!cancelled) {
+            setAvailability(data);
+            setLoadingAvailability(false);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setLoadingAvailability(false);
+        })
     );
     return () => {
       cancelled = true;
