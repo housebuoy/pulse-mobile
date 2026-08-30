@@ -10,9 +10,13 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter} from 'expo-router';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleIcon } from '@/components/ui/google-icon';
+// Static imports — dynamic ones add Metro module-resolution latency to the
+// submit tap and are a crash risk in Expo Go (bug-triage FE-8, FE-26).
+import { signup } from '@/lib/api/auth';
 
 export default function SignUpScreen() {
   const [showPassword, setShowPassword] = useState(false);
@@ -34,8 +38,6 @@ export default function SignUpScreen() {
     }
     setBusy(true);
     try {
-      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-      const { signup } = await import('@/lib/api/auth');
       await signup({ fullName, phone, password, ghanaCard });
       await AsyncStorage.setItem('pulse_pending_signup', JSON.stringify({ phone, password }));
       router.push({ pathname: '/(auth)/otp', params: { phone } });
@@ -186,14 +188,14 @@ export default function SignUpScreen() {
             </View>
 
             {/* --- MAIN SIGN UP BUTTON (Routes to OTP) --- */}
-            {error ? (
-              <Text className="mb-3 text-center text-sm text-red-500">{error}</Text>
-            ) : null}
+            {error ? <Text className="mb-3 text-center text-sm text-red-500">{error}</Text> : null}
             <TouchableOpacity
               className="mb-8 items-center rounded-2xl bg-primary py-4 shadow-lg shadow-blue-500/40"
               disabled={busy}
               onPress={handleSignUp}>
-              <Text className="text-lg font-bold text-white">{busy ? 'Sending OTP…' : 'Sign Up'}</Text>
+              <Text className="text-lg font-bold text-white">
+                {busy ? 'Sending OTP…' : 'Sign Up'}
+              </Text>
             </TouchableOpacity>
 
             {/* --- DIVIDER --- */}
