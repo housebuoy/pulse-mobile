@@ -15,49 +15,53 @@ import { useQueueStore } from '@/stores/queue-store';
 import { usePaymentsStore } from '@/stores/payments-store';
 import { useRecordsStore } from '@/stores/records-store';
 
-/** Pull live (or mock) data into Zustand after login. Failures leave seeds. */
+/**
+ * Pull live (or mock) data into Zustand after login. Failures leave seeds.
+ *
+ * Performance (bug-triage FE-26): ALL store groups are fetched in ONE
+ * concurrent round — previously 5 sequential rounds of API calls (profile+medical
+ * → insurance → ticket → payments → records) added ~3–5s of serial latency to
+ * every sign-in. Promise.allSettled keeps one group's failure from blocking the
+ * others (same semantics as the old per-group try/catch).
+ */
 export async function hydrateAfterLogin(): Promise<void> {
-  try {
-    const [profile, medical] = await Promise.all([getProfile(), getMedical()]);
+  const [profileRes, medicalRes, insuranceRes, ticketRes, paymentsRes, recordsRes] =
+    await Promise.allSettled([
+      getProfile(),
+      getMedical(),
+      getInsurance(),
+      getMyTicket(),
+      Promise.all([getOutstanding(), getPaymentMethods(), getPaymentHistory()]),
+      getRecords(),
+    ]);
+
+  if (profileRes.status === 'fulfilled' && medicalRes.status === 'fulfilled') {
+    const profile = profileRes.value;
+    const medical = medicalRes.value;
     useProfileStore.getState().hydrateFromApi(profile);
     useMedicalStore.getState().hydrateFromApi({
       ...medical,
       emergencyContact: profile.emergencyContact ?? useMedicalStore.getState().emergencyContact,
     });
-  } catch {
-    // keep seeds
   }
 
-  try {
-    const ins = await getInsurance();
+  if (insuranceRes.status === 'fulfilled') {
+    const ins = insuranceRes.value;
     useInsuranceStore.getState().setInsuranceDetails(ins);
     useInsuranceStore.getState().setCardPhotoUri(ins.cardPhotoUri);
-  } catch {
-    /* keep seeds */
   }
 
-  try {
-    const ticket = await getMyTicket();
+  if (ticketRes.status === 'fulfilled') {
+    const ticket = ticketRes.value;
     if (ticket) useQueueStore.getState().setTicket(ticket);
-  } catch {
-    /* keep seeds */
   }
 
-  try {
-    const [outstanding, methods, history] = await Promise.all([
-      getOutstanding(),
-      getPaymentMethods(),
-      getPaymentHistory(),
-    ]);
+  if (paymentsRes.status === 'fulfilled') {
+    const [outstanding, methods, history] = paymentsRes.value;
     usePaymentsStore.getState().hydrateFromApi({ outstanding, methods, history });
-  } catch {
-    /* keep seeds */
   }
 
-  try {
-    const records = await getRecords();
-    useRecordsStore.getState().hydrateFromApi(records);
-  } catch {
-    /* keep seeds */
+  if (recordsRes.status === 'fulfilled') {
+    useRecordsStore.getState().hydrateFromApi(recordsRes.value);
   }
 }

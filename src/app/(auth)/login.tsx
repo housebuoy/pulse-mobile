@@ -14,6 +14,11 @@ import { Link, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GoogleIcon } from '@/components/ui/google-icon';
 import { COLORS } from '@/constants/theme';
+// Static imports (not `await import(...)`) — dynamic imports add Metro module
+// resolution latency to the sign-in tap and are a crash risk in Expo Go
+// (bug-triage FE-8).
+import { login } from '@/lib/api/auth';
+import { hydrateAfterLogin } from '@/lib/api/hydrate';
 
 export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
@@ -27,8 +32,6 @@ export default function LoginScreen() {
     setError(null);
     setBusy(true);
     try {
-      const { login } = await import('@/lib/api/auth');
-      const { hydrateAfterLogin } = await import('@/lib/api/hydrate');
       await login(identifier.trim(), password);
       await hydrateAfterLogin();
       router.replace('/(tabs)/home');
