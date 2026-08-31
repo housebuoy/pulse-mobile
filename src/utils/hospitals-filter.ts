@@ -14,9 +14,11 @@ const PRESET_MAX_KM: Record<DistancePreset, number | null> = {
   under10: 10,
 };
 
-export function isWithinDistancePreset(distanceKm: number, preset: DistancePreset): boolean {
+export function isWithinDistancePreset(distanceKm: number | null, preset: DistancePreset): boolean {
   const max = PRESET_MAX_KM[preset];
   if (max === null) return true;
+  // Unknown distance (API returns null) — don't hide the hospital behind a preset.
+  if (distanceKm === null) return true;
   return distanceKm <= max;
 }
 
