@@ -17,11 +17,14 @@ import { COLORS } from '@/constants/theme';
 import DateStrip from '@/components/book-appointment/date-strip';
 import MonthSelector from '@/components/book-appointment/month-selector';
 import TimeSlotPicker, { TimeSlot } from '@/components/book-appointment/time-slot-picker';
+import AskAiSheet from '@/components/book-appointment/ask-ai-sheet';
 import Divider from '@/components/ui/divider';
 import Dropdown, { DropdownOption } from '@/components/ui/dropdown-menu';
-import { HospitalAvailability } from '@/services/mock/hospital-schedule';
-import { useBookingStore } from '@/stores/booking-store';
 import type { DepartmentOption } from '@/lib/api/discovery';
+// import { DEPARTMENTS } from '@/constants/departments';
+import { fetchMockAvailability, HospitalAvailability } from '@/services/mock/hospital-schedule';
+import { useBookingStore } from '@/stores/booking-store';
+import { useHospitalsStore } from '@/stores/hospitals-store';
 
 // const { width, height } = Dimensions.get('window');
 const HEADER_HEIGHT = 280; // Total height of the image area
@@ -83,6 +86,14 @@ export default function HospitalDetailsScreen() {
   const [deptOptions, setDeptOptions] = useState<DropdownOption[]>([]);
   const [deptMap, setDeptMap] = useState<Record<string, number>>({});
   const [deptDoctors, setDeptDoctors] = useState<Record<string, boolean>>({});
+  
+
+  const isSaved = useHospitalsStore((state) => 
+    state.savedHospitalIds.includes(params.id as string)
+  );
+  const toggleSaved = useHospitalsStore((state) => state.toggleSaved);
+
+  const [askAiVisible, setAskAiVisible] = useState(false);
 
   useEffect(() => {
     // Fresh booking session per hospital: the store persists in AsyncStorage,
@@ -181,8 +192,15 @@ export default function HospitalDetailsScreen() {
         <TouchableOpacity style={styles.circleButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.circleButton}>
-          <Ionicons name="bookmark-outline" size={20} color="#FFFFFF" />
+        <TouchableOpacity
+          style={[styles.circleButton, isSaved && styles.circleButtonActive]}
+          onPress={() => toggleSaved(params.id as string)}
+          activeOpacity={0.8}>
+          <Ionicons
+            name={isSaved ? 'bookmark' : 'bookmark-outline'}
+            size={20}
+            color={isSaved ? COLORS.primary : '#FFFFFF'}
+          />
         </TouchableOpacity>
       </SafeAreaView>
 
@@ -250,7 +268,10 @@ export default function HospitalDetailsScreen() {
           {/* 3. Department Selector */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>1. Select Department</Text>
-            <TouchableOpacity style={styles.aiAssistButton}>
+            <TouchableOpacity
+              style={styles.aiAssistButton}
+              onPress={() => setAskAiVisible(true)}
+              activeOpacity={0.7}>
               <Text style={styles.aiAssistText}>Not sure? Ask AI ✨</Text>
             </TouchableOpacity>
           </View>
@@ -387,6 +408,12 @@ export default function HospitalDetailsScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      <AskAiSheet
+        visible={askAiVisible}
+        onClose={() => setAskAiVisible(false)}
+        onSelectDepartment={(value) => setDepartment(value)}
+      />
     </View>
   );
 }
@@ -430,6 +457,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)', // Darker so it's visible on bright skies
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  circleButtonActive: {
+    backgroundColor: '#FFFFFF',
   },
 
   // Scroll Area
@@ -554,11 +584,16 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   aiAssistButton: {
-    padding: 4,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
   },
   aiAssistText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.primary,
   },
   monthLabel: {

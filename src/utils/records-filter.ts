@@ -1,4 +1,7 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { matchesQuery, uniqueSorted } from './search';
+
+export { matchesQuery, uniqueSorted };
 
 export type DatePreset = 'all' | '30d' | '6m' | '1y';
 
@@ -22,12 +25,6 @@ export function isWithinDatePreset(dateIso: string, preset: DatePreset): boolean
   return differenceInCalendarDays(new Date(), parseISO(dateIso)) <= days;
 }
 
-export function matchesQuery(fields: string[], query: string): boolean {
-  if (!query.trim()) return true;
-  const needle = query.trim().toLowerCase();
-  return fields.some((field) => field.toLowerCase().includes(needle));
-}
-
 export interface RecordsFilterState {
   datePreset: DatePreset;
   hospital: string | null;
@@ -44,8 +41,4 @@ export const DEFAULT_RECORDS_FILTER: RecordsFilterState = {
 
 export function isFilterActive(filter: RecordsFilterState): boolean {
   return filter.datePreset !== 'all' || !!filter.hospital || !!filter.doctor || !!filter.type;
-}
-
-export function uniqueSorted(values: string[]): string[] {
-  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
 }
