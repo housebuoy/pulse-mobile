@@ -21,8 +21,8 @@ import AskAiSheet from '@/components/book-appointment/ask-ai-sheet';
 import Divider from '@/components/ui/divider';
 import Dropdown, { DropdownOption } from '@/components/ui/dropdown-menu';
 import type { DepartmentOption } from '@/lib/api/discovery';
-// import { DEPARTMENTS } from '@/constants/departments';
-import { fetchMockAvailability, HospitalAvailability } from '@/services/mock/hospital-schedule';
+import { DEPARTMENTS } from '@/constants/departments';
+import { HospitalAvailability } from '@/services/mock/hospital-schedule';
 import { useBookingStore } from '@/stores/booking-store';
 import { useHospitalsStore } from '@/stores/hospitals-store';
 
@@ -86,9 +86,8 @@ export default function HospitalDetailsScreen() {
   const [deptOptions, setDeptOptions] = useState<DropdownOption[]>([]);
   const [deptMap, setDeptMap] = useState<Record<string, number>>({});
   const [deptDoctors, setDeptDoctors] = useState<Record<string, boolean>>({});
-  
 
-  const isSaved = useHospitalsStore((state) => 
+  const isSaved = useHospitalsStore((state) =>
     state.savedHospitalIds.includes(params.id as string)
   );
   const toggleSaved = useHospitalsStore((state) => state.toggleSaved);
@@ -412,7 +411,18 @@ export default function HospitalDetailsScreen() {
       <AskAiSheet
         visible={askAiVisible}
         onClose={() => setAskAiVisible(false)}
-        onSelectDepartment={(value) => setDepartment(value)}
+        onSelectDepartment={(value) => {
+          // Resolve the AI suggestion (a DEPARTMENTS slug like 'general') to a
+          // real dropdown option. deptOptions values are stringified department
+          // ids, so match by label (case-insensitive) and pass the numeric id.
+          const suggestion = DEPARTMENTS.find((d) => d.value === value);
+          const option =
+            suggestion &&
+            deptOptions.find((o) => o.label.toLowerCase() === suggestion.label.toLowerCase());
+          if (option) {
+            setDepartment(option.value, deptMap[option.value] ?? Number(option.value));
+          }
+        }}
       />
     </View>
   );
