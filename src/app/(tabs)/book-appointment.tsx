@@ -1,26 +1,40 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { COLORS } from '@/constants/theme';
 import SearchBar from '../../components/ui/search-bar';
 import EmergencyBanner from '../../components/ui/emergency-banner';
 import CategoryPills from '../../components/ui/category-pills';
 import HospitalCard from '../../components/ui/hospital-card';
 import SectionHeader from '@/components/shared/section-header';
+import HospitalsFilterSheet from '@/components/book-appointment/hospitals-filter-sheet';
 import type { HospitalCard as HospitalCardData } from '@/lib/api/discovery';
+import {
+  DEFAULT_HOSPITALS_FILTER,
+  HospitalsFilterState,
+  isHospitalsFilterActive,
+  isWithinDistancePreset,
+} from '@/utils/hospitals-filter';
+import { matchesQuery, uniqueSorted } from '@/utils/search';
 
 const BANNER_HEIGHT = 80;
 
 export default function BookAppointmentScreen() {
   const router = useRouter();
-  const [activeCategory, setActiveCategory] = useState('General');
+
+  // Teammate's API State
   const [hospitals, setHospitals] = useState<HospitalCardData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState('');
+
+  // Your Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<HospitalsFilterState>(DEFAULT_HOSPITALS_FILTER);
+  const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+
   const scrollY = useRef(new Animated.Value(0)).current;
 
+  // Teammate's Data Fetching
   useEffect(() => {
     let active = true;
     import('@/lib/api/discovery')
@@ -57,28 +71,27 @@ export default function BookAppointmentScreen() {
     extrapolate: 'clamp',
   });
 
-  // Live search + category filtering of the hospital list (FE-18). 'General'
-  // category means "show everything"; other pills match hospital specialties.
-  const filteredHospitals = hospitals.filter((h) => {
-    const q = query.trim().toLowerCase();
-    const matchesQuery =
-      !q ||
-      h.name.toLowerCase().includes(q) ||
-      h.location.toLowerCase().includes(q) ||
-      (h.specialties ?? []).some((s) => s.toLowerCase().includes(q));
-    const matchesCategory =
-      activeCategory === 'General' ||
-      (h.specialties ?? []).some((s) => s.toLowerCase().includes(activeCategory.toLowerCase()));
-    return matchesQuery && matchesCategory;
-  });
+  // Your Dynamic Categories merged with Teammate's data structure
+  const categoryOptions = useMemo(
+    () => uniqueSorted(hospitals.flatMap((h) => h.specialties ?? [])),
+    [hospitals]
+  );
+  const pillCategories = useMemo(() => ['All', ...categoryOptions], [categoryOptions]);
+
+  // Your Advanced Filtering merged with Teammate's API data
+  const filteredHospitals = useMemo(() => {
+    return hospitals.filter((h) => {
+      if (filter.category !== 'All' && !(h.specialties ?? []).includes(filter.category))
+        return false;
+      if (!isWithinDistancePreset(h.distanceKm, filter.distancePreset)) return false;
+      return matchesQuery([h.name, h.location, ...(h.specialties ?? [])], searchQuery);
+    });
+  }, [hospitals, filter, searchQuery]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* 1. HEADER */}
       <View style={styles.header}>
-        {/* <TouchableOpacity onPress={() => router.back()} style={styles.headerSideBtn}>
-          <Ionicons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity> */}
         <Text style={styles.headerTitle}>Book Appointment</Text>
         <Animated.View
           style={[styles.headerSideBtn, { opacity: sosOpacity, alignItems: 'flex-end' }]}>
@@ -91,7 +104,13 @@ export default function BookAppointmentScreen() {
 
       {/* 2. SEARCH BAR — pinned */}
       <View style={styles.searchContainer}>
-        <SearchBar value={query} onChangeText={setQuery} />
+        <SearchBar
+          placeholder="Search hospitals, categories, or locations..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onFilterPress={() => setFilterSheetVisible(true)}
+          filterActive={isHospitalsFilterActive(filter)}
+        />
       </View>
 
       {/* 3. SCROLL */}
@@ -120,27 +139,28 @@ export default function BookAppointmentScreen() {
             },
           ]}>
           <CategoryPills
-            categories={['General', 'Dentist', 'Eye', 'Cardiology']}
-            activeCategory={activeCategory}
-            onSelect={setActiveCategory}
+            categories={pillCategories}
+            activeCategory={filter.category}
+            onSelect={(category) => setFilter((prev) => ({ ...prev, category }))}
           />
         </Animated.View>
 
         {/* CHILD 2 — cards */}
         <View style={styles.cardsWrapper}>
           <SectionHeader title="Available Hospitals" />
+
           {loading ? (
             <>
               <HospitalCardSkeleton />
               <HospitalCardSkeleton />
               <HospitalCardSkeleton />
             </>
-          ) : hospitals.length === 0 ? (
-            <Text style={styles.emptyText}>
-              No hospitals available right now. Please check back soon.
-            </Text>
           ) : filteredHospitals.length === 0 ? (
-            <Text style={styles.emptyText}>No hospitals match your search.</Text>
+            <Text style={styles.emptyText}>
+              {hospitals.length === 0
+                ? 'No hospitals available right now. Please check back soon.'
+                : 'No hospitals match your search or filters'}
+            </Text>
           ) : (
             filteredHospitals.map((h) => (
               <HospitalCard
@@ -179,6 +199,14 @@ export default function BookAppointmentScreen() {
           )}
         </View>
       </Animated.ScrollView>
+
+      <HospitalsFilterSheet
+        visible={filterSheetVisible}
+        onClose={() => setFilterSheetVisible(false)}
+        filter={filter}
+        onApply={setFilter}
+        categoryOptions={categoryOptions}
+      />
     </SafeAreaView>
   );
 }
@@ -194,11 +222,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   headerSideBtn: { width: 70, justifyContent: 'center' },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111827',
-  },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: '#111827' },
   sosButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -220,23 +244,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   cardsWrapper: { paddingHorizontal: 20, paddingTop: 12, gap: 16 },
-  fab: {
-    position: 'absolute',
-    bottom: 30,
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-  },
-  emptyText: { color: '#6B7280', fontSize: 14, textAlign: 'center', paddingVertical: 32 },
+  emptyText: { fontSize: 14, color: '#9CA3AF', textAlign: 'center', paddingVertical: 24 },
   skeletonCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
