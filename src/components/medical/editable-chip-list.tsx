@@ -1,17 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Alert,
-  Keyboard,
-} from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 
@@ -59,34 +47,26 @@ export default function EditableChipList({
   emptyText,
   danger,
 }: EditableChipListProps) {
-  const [modalVisible, setModalVisible] = useState(false);
+  // FE-31: this used to be a <Modal> bottom sheet, but on iOS the FIRST tap
+  // while the keyboard is open gets consumed by UIKit keyboard-dismissal
+  // BEFORE React Native receives it (verified with onPressIn diagnostics — no
+  // event ever fired). The check key worked because it's part of the keyboard.
+  // Fix: an INLINE form inside the card — no UIKit modal, standard touch
+  // delivery, first tap always registers.
+  const [adding, setAdding] = useState(false);
   const [label, setLabel] = useState('');
   const [selectedType, setSelectedType] = useState(typeOptions?.[0]?.value);
-  // FE-31: the Add button was landing flush against the keyboard's top edge,
-  // and iOS swallows first touches in that boundary zone (UIKit keyboard
-  // dismissal) BEFORE React Native sees them — hence no pressIn/handleAdd on
-  // the first tap. Lift the footer clear of the keyboard while it is open.
-  const [kbHeight, setKbHeight] = useState(0);
-
-  useEffect(() => {
-    const show = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => setKbHeight(e.endCoordinates.height)
-    );
-    const hide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKbHeight(0)
-    );
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
 
   const typeLabelFor = (type?: string) => typeOptions?.find((t) => t.value === type)?.label;
 
-  const closeModal = () => {
-    setModalVisible(false);
+  const openForm = () => {
+    setLabel('');
+    setSelectedType(typeOptions?.[0]?.value);
+    setAdding(true);
+  };
+
+  const closeForm = () => {
+    setAdding(false);
     setLabel('');
     setSelectedType(typeOptions?.[0]?.value);
   };
@@ -94,12 +74,7 @@ export default function EditableChipList({
   const handleAdd = () => {
     const trimmed = label.trim();
     if (!trimmed) return;
-    // TEMP DIAGNOSTIC (FE-31): log every entry to this handler
-    console.log('[chip-add] handleAdd fired, label=', trimmed);
-    // Close instantly (optimistic) — the persist runs in the background and
-    // rolls back + alerts on failure (bug-triage FE-29). Awaiting the network
-    // here made the modal linger for seconds.
-    closeModal();
+    closeForm();
     onAdd(trimmed, selectedType).catch(() =>
       Alert.alert('Could not save', 'Check your connection and try again.')
     );
@@ -114,10 +89,7 @@ export default function EditableChipList({
           </View>
           <Text style={styles.title}>{title}</Text>
         </View>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setModalVisible(true)}
-          activeOpacity={0.7}>
+        <TouchableOpacity style={styles.addButton} onPress={openForm} activeOpacity={0.7}>
           <Ionicons name="add" size={16} color={COLORS.primary} />
           <Text style={styles.addButtonText}>{addLabel}</Text>
         </TouchableOpacity>
@@ -152,79 +124,50 @@ export default function EditableChipList({
         </View>
       )}
 
-      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={closeModal}>
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={closeModal}>
-          {/* KAV + ScrollView so the keyboard never covers the input (bug-triage FE-27) */}
-          <KeyboardAvoidingView
-            style={{ flex: 1, justifyContent: 'flex-end' }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={styles.sheet} onStartShouldSetResponder={() => true}>
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Add {title.replace(/s$/, '')}</Text>
-                <TouchableOpacity onPress={closeModal}>
-                  <Ionicons name="close" size={20} color="#6B7280" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                style={styles.sheetBody}
-                keyboardShouldPersistTaps="always"
-                showsVerticalScrollIndicator={false}>
-                {typeOptions && (
-                  <View style={styles.typeRow}>
-                    {typeOptions.map((opt) => {
-                      const active = selectedType === opt.value;
-                      return (
-                        <TouchableOpacity
-                          key={opt.value}
-                          style={[styles.typePill, active && styles.typePillActive]}
-                          onPress={() => setSelectedType(opt.value)}>
-                          <Text style={[styles.typePillText, active && styles.typePillTextActive]}>
-                            {opt.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-
-                <TextInput
-                  value={label}
-                  onChangeText={setLabel}
-                  placeholder={inputPlaceholder}
-                  placeholderTextColor="#9CA3AF"
-                  style={styles.input}
-                  autoFocus
-                  onSubmitEditing={handleAdd}
-                  returnKeyType="done"
-                />
-              </ScrollView>
-
-              {/* Fixed footer: the Add button lives OUTSIDE the main ScrollView.
-                  It sits in its own non-scrolling ScrollView with
-                  keyboardShouldPersistTaps="always" so iOS's keyboard-tap
-                  handling never swallows the first tap (bug-triage FE-31). */}
-              <ScrollView
-                style={styles.sheetFooter}
-                contentContainerStyle={[
-                  styles.sheetFooterContent,
-                  kbHeight > 0 && styles.sheetFooterKeyboardLift,
-                ]}
-                scrollEnabled={false}
-                keyboardShouldPersistTaps="always"
-                showsVerticalScrollIndicator={false}>
-                <TouchableOpacity
-                  style={[styles.confirmButton, !label.trim() && styles.confirmButtonDisabled]}
-                  disabled={!label.trim()}
-                  onPressIn={() => console.log('[chip-add] button pressIn')}
-                  onPress={handleAdd}>
-                  <Text style={styles.confirmButtonText}>Add</Text>
-                </TouchableOpacity>
-              </ScrollView>
+      {adding && (
+        <View style={styles.inlineForm}>
+          {typeOptions && (
+            <View style={styles.typeRow}>
+              {typeOptions.map((opt) => {
+                const active = selectedType === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[styles.typePill, active && styles.typePillActive]}
+                    onPress={() => setSelectedType(opt.value)}>
+                    <Text style={[styles.typePillText, active && styles.typePillTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          </KeyboardAvoidingView>
-        </TouchableOpacity>
-      </Modal>
+          )}
+
+          <TextInput
+            value={label}
+            onChangeText={setLabel}
+            placeholder={inputPlaceholder}
+            placeholderTextColor="#9CA3AF"
+            style={styles.input}
+            autoFocus
+            onSubmitEditing={handleAdd}
+            returnKeyType="done"
+          />
+
+          <View style={styles.inlineActions}>
+            <TouchableOpacity style={styles.cancelButton} onPress={closeForm} hitSlop={8}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.confirmButton, !label.trim() && styles.confirmButtonDisabled]}
+              disabled={!label.trim()}
+              onPress={handleAdd}>
+              <Text style={styles.confirmButtonText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -323,10 +266,28 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     borderRadius: 16,
     alignItems: 'center',
+    flex: 1,
   },
   confirmButtonDisabled: { backgroundColor: '#93C5FD' },
   confirmButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  inlineForm: {
+    marginTop: 14,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    padding: 14,
+  },
+  inlineActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 12,
+  },
+  cancelButton: { paddingHorizontal: 8, paddingVertical: 6 },
+  cancelButtonText: { color: '#6B7280', fontSize: 15, fontWeight: '600' },
 });
