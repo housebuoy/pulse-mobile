@@ -94,8 +94,6 @@ export default function EditableChipList({
   const handleAdd = () => {
     const trimmed = label.trim();
     if (!trimmed) return;
-    // TEMP DIAGNOSTIC (FE-31): log every entry to this handler
-    console.log('[chip-add] handleAdd fired, label=', trimmed);
     // Close instantly (optimistic) — the persist runs in the background and
     // rolls back + alerts on failure (bug-triage FE-29). Awaiting the network
     // here made the modal linger for seconds.
@@ -216,7 +214,6 @@ export default function EditableChipList({
                 <TouchableOpacity
                   style={[styles.confirmButton, !label.trim() && styles.confirmButtonDisabled]}
                   disabled={!label.trim()}
-                  onPressIn={() => console.log('[chip-add] button pressIn')}
                   onPress={handleAdd}>
                   <Text style={styles.confirmButtonText}>Add</Text>
                 </TouchableOpacity>
