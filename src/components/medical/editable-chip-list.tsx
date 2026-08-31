@@ -216,7 +216,6 @@ export default function EditableChipList({
                 <TouchableOpacity
                   style={[styles.confirmButton, !label.trim() && styles.confirmButtonDisabled]}
                   disabled={!label.trim()}
-                  onTouchStart={() => console.log('[chip-add] button onTouchStart')}
                   onPressIn={() => console.log('[chip-add] button pressIn')}
                   onPress={handleAdd}>
                   <Text style={styles.confirmButtonText}>Add</Text>
