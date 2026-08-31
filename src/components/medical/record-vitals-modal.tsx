@@ -151,16 +151,21 @@ export default function RecordVitalsModal({ visible, onClose }: RecordVitalsModa
                 </View>
               </View>
             </ScrollView>
-            {/* Fixed footer — button outside the ScrollView so the first tap
-                  is never swallowed by keyboard dismissal (bug-triage FE-31). */}
-            <View style={styles.sheetFooter}>
+            {/* Fixed footer — non-scrolling ScrollView so iOS keyboard-tap
+                handling never swallows the first tap (bug-triage FE-31). */}
+            <ScrollView
+              style={styles.sheetFooter}
+              contentContainerStyle={styles.sheetFooterContent}
+              scrollEnabled={false}
+              keyboardShouldPersistTaps="always"
+              showsVerticalScrollIndicator={false}>
               <TouchableOpacity
                 style={[styles.confirmButton, !hasAnyValue && styles.confirmButtonDisabled]}
                 disabled={!hasAnyValue}
                 onPress={handleSave}>
                 <Text style={styles.confirmButtonText}>Save Entry</Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </TouchableOpacity>
@@ -188,7 +193,8 @@ const styles = StyleSheet.create({
   },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
   sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, flexShrink: 1 },
-  sheetFooter: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
+  sheetFooter: { paddingHorizontal: 20, paddingTop: 8, flexGrow: 0 },
+  sheetFooterContent: { paddingBottom: 24 },
   hint: { fontSize: 13, color: '#9CA3AF', marginBottom: 16 },
   row: { flexDirection: 'row', gap: 12 },
   rowInput: { flex: 1 },

@@ -177,17 +177,23 @@ export default function EditableChipList({
                 />
               </ScrollView>
 
-              {/* Fixed footer: the Add button lives OUTSIDE the ScrollView so
-                  iOS keyboard dismissal can never swallow its first tap
-                  (bug-triage FE-31) — same handler as the keyboard check key. */}
-              <View style={styles.sheetFooter}>
+              {/* Fixed footer: the Add button lives OUTSIDE the main ScrollView.
+                  It sits in its own non-scrolling ScrollView with
+                  keyboardShouldPersistTaps="always" so iOS's keyboard-tap
+                  handling never swallows the first tap (bug-triage FE-31). */}
+              <ScrollView
+                style={styles.sheetFooter}
+                contentContainerStyle={styles.sheetFooterContent}
+                scrollEnabled={false}
+                keyboardShouldPersistTaps="always"
+                showsVerticalScrollIndicator={false}>
                 <TouchableOpacity
                   style={[styles.confirmButton, !label.trim() && styles.confirmButtonDisabled]}
                   disabled={!label.trim()}
                   onPress={handleAdd}>
                   <Text style={styles.confirmButtonText}>Add</Text>
                 </TouchableOpacity>
-              </View>
+              </ScrollView>
             </View>
           </KeyboardAvoidingView>
         </TouchableOpacity>
@@ -263,7 +269,8 @@ const styles = StyleSheet.create({
   },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
   sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, flexShrink: 1 },
-  sheetFooter: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 },
+  sheetFooter: { paddingHorizontal: 20, paddingTop: 8, flexGrow: 0 },
+  sheetFooterContent: { paddingBottom: 24 },
   typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   typePill: {
     paddingVertical: 8,
