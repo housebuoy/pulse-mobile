@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 import { MedicationEntry, useMedicalStore } from '@/stores/medical-store';
@@ -34,12 +45,12 @@ export default function MedicationsCard() {
   const handleSave = () => {
     const trimmedName = name.trim();
     if (!trimmedName) return;
-    if (editing) {
-      updateMedication(editing.id, trimmedName, dose.trim());
-    } else {
-      addMedication(trimmedName, dose.trim());
-    }
+    // Close instantly; persist in background with rollback + alert (FE-29).
     closeModal();
+    (editing
+      ? updateMedication(editing.id, trimmedName, dose.trim())
+      : addMedication(trimmedName, dose.trim())
+    ).catch(() => Alert.alert('Could not save', 'Check your connection and try again.'));
   };
 
   return (
@@ -71,7 +82,11 @@ export default function MedicationsCard() {
               {!!medication.dose && <Text style={styles.medDose}>{medication.dose}</Text>}
             </View>
             <TouchableOpacity
-              onPress={() => removeMedication(medication.id)}
+              onPress={() => {
+                removeMedication(medication.id).catch(() =>
+                  Alert.alert('Could not remove', 'Check your connection and try again.')
+                );
+              }}
               hitSlop={8}
               style={styles.medRemove}>
               <Ionicons name="close" size={16} color="#9CA3AF" />
@@ -82,44 +97,63 @@ export default function MedicationsCard() {
 
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={closeModal}>
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={closeModal}>
-          <View style={styles.sheet} onStartShouldSetResponder={() => true}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{editing ? 'Edit Medication' : 'Add Medication'}</Text>
-              <TouchableOpacity onPress={closeModal}>
-                <Ionicons name="close" size={20} color="#6B7280" />
-              </TouchableOpacity>
+          <KeyboardAvoidingView
+            style={{ flex: 1, justifyContent: 'flex-end' }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>
+                  {editing ? 'Edit Medication' : 'Add Medication'}
+                </Text>
+                <TouchableOpacity onPress={closeModal}>
+                  <Ionicons name="close" size={20} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Keyboard-safe body (bug-triage FE-27) */}
+              <ScrollView
+                style={styles.sheetBody}
+                keyboardShouldPersistTaps="always"
+                showsVerticalScrollIndicator={false}>
+                <Text style={styles.inputLabel}>Name</Text>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="e.g. Metformin"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                  autoFocus
+                />
+
+                <Text style={styles.inputLabel}>Dose</Text>
+                <TextInput
+                  value={dose}
+                  onChangeText={setDose}
+                  placeholder="e.g. 500mg, twice daily"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                  onSubmitEditing={handleSave}
+                  returnKeyType="done"
+                />
+              </ScrollView>
+
+              {/* Fixed footer — non-scrolling ScrollView so iOS keyboard-tap
+                  handling never swallows the first tap (bug-triage FE-31). */}
+              <ScrollView
+                style={styles.sheetFooter}
+                contentContainerStyle={styles.sheetFooterContent}
+                scrollEnabled={false}
+                keyboardShouldPersistTaps="always"
+                showsVerticalScrollIndicator={false}>
+                <TouchableOpacity
+                  style={[styles.confirmButton, !name.trim() && styles.confirmButtonDisabled]}
+                  disabled={!name.trim()}
+                  onPress={handleSave}>
+                  <Text style={styles.confirmButtonText}>{editing ? 'Save' : 'Add'}</Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
-
-            <View style={styles.sheetBody}>
-              <Text style={styles.inputLabel}>Name</Text>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder="e.g. Metformin"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                autoFocus
-              />
-
-              <Text style={styles.inputLabel}>Dose</Text>
-              <TextInput
-                value={dose}
-                onChangeText={setDose}
-                placeholder="e.g. 500mg, twice daily"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                onSubmitEditing={handleSave}
-                returnKeyType="done"
-              />
-
-              <TouchableOpacity
-                style={[styles.confirmButton, !name.trim() && styles.confirmButtonDisabled]}
-                disabled={!name.trim()}
-                onPress={handleSave}>
-                <Text style={styles.confirmButtonText}>{editing ? 'Save' : 'Add'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -168,7 +202,13 @@ const styles = StyleSheet.create({
   medRemove: { padding: 4 },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8 },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    maxHeight: '85%',
+  },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -179,7 +219,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
+  sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, flexShrink: 1 },
+  sheetFooter: { paddingHorizontal: 20, paddingTop: 8, flexGrow: 0 },
+  sheetFooterContent: { paddingBottom: 24 },
   inputLabel: {
     fontSize: 11,
     fontWeight: '600',

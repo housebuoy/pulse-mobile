@@ -14,7 +14,11 @@ interface EmergencyShareSheetProps {
 // only, nothing interpreted. The Share button hands the same text off to
 // the OS share sheet (Messages, WhatsApp, etc.) so it can travel with the
 // patient; no network call is made by the app itself.
-export default function EmergencyShareSheet({ visible, onClose, patientName }: EmergencyShareSheetProps) {
+export default function EmergencyShareSheet({
+  visible,
+  onClose,
+  patientName,
+}: EmergencyShareSheetProps) {
   const bloodGroup = useMedicalStore((state) => state.bloodGroup);
   const allergies = useMedicalStore((state) => state.allergies);
   const conditions = useMedicalStore((state) => state.conditions);

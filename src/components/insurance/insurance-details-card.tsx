@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 import { useInsuranceStore } from '@/stores/insurance-store';
@@ -60,7 +71,9 @@ export default function InsuranceDetailsCard() {
     };
     setInsuranceDetails(details);
     setModalVisible(false);
-    void import('@/lib/api/patient').then(({ putInsurance }) => putInsurance(details));
+    void import('@/lib/api/patient')
+      .then(({ putInsurance }) => putInsurance(details))
+      .catch(() => Alert.alert('Could not save', 'Check your connection and try again.'));
   };
 
   return (
@@ -92,76 +105,94 @@ export default function InsuranceDetailsCard() {
           style={styles.backdrop}
           activeOpacity={1}
           onPress={() => setModalVisible(false)}>
-          <View style={styles.sheet} onStartShouldSetResponder={() => true}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Edit Insurance Details</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={20} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.sheetBody} keyboardShouldPersistTaps="handled">
-              <Text style={styles.inputLabel}>Scheme</Text>
-              <View style={styles.schemeGrid}>
-                {SCHEME_OPTIONS.map((option) => {
-                  const active = schemeChoice === option;
-                  return (
-                    <TouchableOpacity
-                      key={option}
-                      style={[styles.schemeChip, active && styles.schemeChipActive]}
-                      onPress={() => setSchemeChoice(option)}>
-                      <Text style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>
-                        {option}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+          {/* KAV so the keyboard never covers the inputs (bug-triage FE-27) */}
+          <KeyboardAvoidingView
+            style={{ flex: 1, justifyContent: 'flex-end' }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>Edit Insurance Details</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <Ionicons name="close" size={20} color="#6B7280" />
+                </TouchableOpacity>
               </View>
 
-              {schemeChoice === 'Other' && (
+              <ScrollView
+                style={styles.sheetBody}
+                keyboardShouldPersistTaps="always"
+                showsVerticalScrollIndicator={false}>
+                <Text style={styles.inputLabel}>Scheme</Text>
+                <View style={styles.schemeGrid}>
+                  {SCHEME_OPTIONS.map((option) => {
+                    const active = schemeChoice === option;
+                    return (
+                      <TouchableOpacity
+                        key={option}
+                        style={[styles.schemeChip, active && styles.schemeChipActive]}
+                        onPress={() => setSchemeChoice(option)}>
+                        <Text
+                          style={[styles.schemeChipText, active && styles.schemeChipTextActive]}>
+                          {option}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {schemeChoice === 'Other' && (
+                  <TextInput
+                    value={customScheme}
+                    onChangeText={setCustomScheme}
+                    placeholder="Enter scheme name"
+                    placeholderTextColor="#9CA3AF"
+                    style={[styles.input, { marginTop: 12 }]}
+                  />
+                )}
+
+                <Text style={[styles.inputLabel, { marginTop: 16 }]}>Membership Number</Text>
                 <TextInput
-                  value={customScheme}
-                  onChangeText={setCustomScheme}
-                  placeholder="Enter scheme name"
+                  value={membershipInput}
+                  onChangeText={setMembershipInput}
+                  placeholder="e.g. 12345678"
                   placeholderTextColor="#9CA3AF"
-                  style={[styles.input, { marginTop: 12 }]}
+                  style={styles.input}
                 />
-              )}
 
-              <Text style={[styles.inputLabel, { marginTop: 16 }]}>Membership Number</Text>
-              <TextInput
-                value={membershipInput}
-                onChangeText={setMembershipInput}
-                placeholder="e.g. 12345678"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-              />
+                <Text style={styles.inputLabel}>Cardholder Name</Text>
+                <TextInput
+                  value={cardholderInput}
+                  onChangeText={setCardholderInput}
+                  placeholder="e.g. Kelvin Quarcoo"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                />
 
-              <Text style={styles.inputLabel}>Cardholder Name</Text>
-              <TextInput
-                value={cardholderInput}
-                onChangeText={setCardholderInput}
-                placeholder="e.g. Kelvin Quarcoo"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-              />
+                <Text style={styles.inputLabel}>Expiry Date</Text>
+                <TextInput
+                  value={expiryInput}
+                  onChangeText={setExpiryInput}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                  onSubmitEditing={handleSave}
+                  returnKeyType="done"
+                />
+              </ScrollView>
 
-              <Text style={styles.inputLabel}>Expiry Date</Text>
-              <TextInput
-                value={expiryInput}
-                onChangeText={setExpiryInput}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                onSubmitEditing={handleSave}
-                returnKeyType="done"
-              />
-
-              <TouchableOpacity style={styles.confirmButton} onPress={handleSave}>
-                <Text style={styles.confirmButtonText}>Save</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
+              {/* Fixed footer — non-scrolling ScrollView so iOS keyboard-tap
+                  handling never swallows the first tap (bug-triage FE-31). */}
+              <ScrollView
+                style={styles.sheetFooter}
+                contentContainerStyle={styles.sheetFooterContent}
+                scrollEnabled={false}
+                keyboardShouldPersistTaps="always"
+                showsVerticalScrollIndicator={false}>
+                <TouchableOpacity style={styles.confirmButton} onPress={handleSave}>
+                  <Text style={styles.confirmButtonText}>Save</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -211,7 +242,13 @@ const styles = StyleSheet.create({
   editButtonText: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8, maxHeight: '85%' },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    maxHeight: '85%',
+  },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -222,7 +259,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  sheetBody: { paddingHorizontal: 20, paddingTop: 16 },
+  sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, flexShrink: 1 },
+  sheetFooter: { paddingHorizontal: 20, paddingTop: 8, flexGrow: 0 },
+  sheetFooterContent: { paddingBottom: 24 },
   inputLabel: {
     fontSize: 11,
     fontWeight: '600',

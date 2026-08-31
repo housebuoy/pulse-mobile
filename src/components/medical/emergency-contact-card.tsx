@@ -1,8 +1,21 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  Linking,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 import { useMedicalStore } from '@/stores/medical-store';
+import { isValidGhanaPhone, PHONE_ERROR_MESSAGE } from '@/lib/phone';
 
 export default function EmergencyContactCard() {
   const emergencyContact = useMedicalStore((state) => state.emergencyContact);
@@ -21,8 +34,18 @@ export default function EmergencyContactCard() {
   };
 
   const handleSave = () => {
-    setEmergencyContact({ name: name.trim(), relationship: relationship.trim(), phone: phone.trim() });
+    const trimmedPhone = phone.trim();
+    // Close instantly; persist in background; alert on failure (FE-29).
+    if (trimmedPhone && !isValidGhanaPhone(trimmedPhone)) {
+      Alert.alert('Invalid phone number', PHONE_ERROR_MESSAGE);
+      return;
+    }
     setModalVisible(false);
+    setEmergencyContact({
+      name: name.trim(),
+      relationship: relationship.trim(),
+      phone: trimmedPhone,
+    }).catch(() => Alert.alert('Could not save', 'Check your connection and try again.'));
   };
 
   const hasContact = emergencyContact.name || emergencyContact.phone;
@@ -76,51 +99,69 @@ export default function EmergencyContactCard() {
           style={styles.backdrop}
           activeOpacity={1}
           onPress={() => setModalVisible(false)}>
-          <View style={styles.sheet} onStartShouldSetResponder={() => true}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>EMERGENCY CONTACT</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={20} color="#6B7280" />
-              </TouchableOpacity>
+          <KeyboardAvoidingView
+            style={{ flex: 1, justifyContent: 'flex-end' }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>EMERGENCY CONTACT</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <Ionicons name="close" size={20} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Keyboard-safe body (bug-triage FE-27) */}
+              <ScrollView
+                style={styles.sheetBody}
+                keyboardShouldPersistTaps="always"
+                showsVerticalScrollIndicator={false}>
+                <Text style={styles.inputLabel}>Name</Text>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="e.g. Ama Quarcoo"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                  autoFocus
+                />
+
+                <Text style={styles.inputLabel}>Relationship</Text>
+                <TextInput
+                  value={relationship}
+                  onChangeText={setRelationship}
+                  placeholder="e.g. Sister"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                />
+
+                <Text style={styles.inputLabel}>Phone</Text>
+                <TextInput
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="e.g. +233 20 987 6543"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                  keyboardType="phone-pad"
+                  maxLength={13}
+                  onSubmitEditing={handleSave}
+                  returnKeyType="done"
+                />
+              </ScrollView>
+
+              {/* Fixed footer — non-scrolling ScrollView so iOS keyboard-tap
+                  handling never swallows the first tap (bug-triage FE-31). */}
+              <ScrollView
+                style={styles.sheetFooter}
+                contentContainerStyle={styles.sheetFooterContent}
+                scrollEnabled={false}
+                keyboardShouldPersistTaps="always"
+                showsVerticalScrollIndicator={false}>
+                <TouchableOpacity style={styles.confirmButton} onPress={handleSave}>
+                  <Text style={styles.confirmButtonText}>Save</Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
-
-            <View style={styles.sheetBody}>
-              <Text style={styles.inputLabel}>Name</Text>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder="e.g. Ama Quarcoo"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                autoFocus
-              />
-
-              <Text style={styles.inputLabel}>Relationship</Text>
-              <TextInput
-                value={relationship}
-                onChangeText={setRelationship}
-                placeholder="e.g. Sister"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-              />
-
-              <Text style={styles.inputLabel}>Phone</Text>
-              <TextInput
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="e.g. +233 20 987 6543"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                keyboardType="phone-pad"
-                onSubmitEditing={handleSave}
-                returnKeyType="done"
-              />
-
-              <TouchableOpacity style={styles.confirmButton} onPress={handleSave}>
-                <Text style={styles.confirmButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -171,7 +212,13 @@ const styles = StyleSheet.create({
   },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8 },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    maxHeight: '85%',
+  },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -182,7 +229,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
+  sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, flexShrink: 1 },
+  sheetFooter: { paddingHorizontal: 20, paddingTop: 8, flexGrow: 0 },
+  sheetFooterContent: { paddingBottom: 24 },
   inputLabel: {
     fontSize: 11,
     fontWeight: '600',

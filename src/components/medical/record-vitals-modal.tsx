@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 import { useMedicalStore } from '@/stores/medical-store';
@@ -41,6 +52,9 @@ export default function RecordVitalsModal({ visible, onClose }: RecordVitalsModa
 
   const handleSave = () => {
     if (!hasAnyValue) return;
+    // Close instantly; persist in background; alert on failure (FE-29).
+    reset();
+    onClose();
     addVitalsEntry({
       systolic: systolic.trim() || undefined,
       diastolic: diastolic.trim() || undefined,
@@ -48,98 +62,112 @@ export default function RecordVitalsModal({ visible, onClose }: RecordVitalsModa
       temperatureC: temperatureC.trim() || undefined,
       heightCm: heightCm.trim() || undefined,
       weightKg: weightKg.trim() || undefined,
-    });
-    reset();
-    onClose();
+    }).catch(() => Alert.alert('Could not save', 'Check your connection and try again.'));
   };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose}>
-        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Record Vitals</Text>
-            <TouchableOpacity onPress={handleClose}>
-              <Ionicons name="close" size={20} color="#6B7280" />
-            </TouchableOpacity>
+        <KeyboardAvoidingView
+          style={{ flex: 1, justifyContent: 'flex-end' }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.sheet} onStartShouldSetResponder={() => true}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Record Vitals</Text>
+              <TouchableOpacity onPress={handleClose}>
+                <Ionicons name="close" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Keyboard-safe body (bug-triage FE-27) */}
+            <ScrollView
+              style={styles.sheetBody}
+              keyboardShouldPersistTaps="always"
+              showsVerticalScrollIndicator={false}>
+              <Text style={styles.hint}>Leave anything blank you don&apos;t want to record.</Text>
+
+              <Text style={styles.inputLabel}>Blood Pressure (mmHg)</Text>
+              <View style={styles.row}>
+                <TextInput
+                  value={systolic}
+                  onChangeText={setSystolic}
+                  placeholder="Systolic"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="number-pad"
+                  style={[styles.input, styles.rowInput]}
+                />
+                <TextInput
+                  value={diastolic}
+                  onChangeText={setDiastolic}
+                  placeholder="Diastolic"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="number-pad"
+                  style={[styles.input, styles.rowInput]}
+                />
+              </View>
+
+              <Text style={styles.inputLabel}>Pulse (bpm)</Text>
+              <TextInput
+                value={pulseBpm}
+                onChangeText={setPulseBpm}
+                placeholder="e.g. 72"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="number-pad"
+                style={styles.input}
+              />
+
+              <Text style={styles.inputLabel}>Temperature (°C)</Text>
+              <TextInput
+                value={temperatureC}
+                onChangeText={setTemperatureC}
+                placeholder="e.g. 36.8"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="decimal-pad"
+                style={styles.input}
+              />
+
+              <View style={styles.row}>
+                <View style={styles.rowInput}>
+                  <Text style={styles.inputLabel}>Height (cm)</Text>
+                  <TextInput
+                    value={heightCm}
+                    onChangeText={setHeightCm}
+                    placeholder="e.g. 178"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                  />
+                </View>
+                <View style={styles.rowInput}>
+                  <Text style={styles.inputLabel}>Weight (kg)</Text>
+                  <TextInput
+                    value={weightKg}
+                    onChangeText={setWeightKg}
+                    placeholder="e.g. 74"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="decimal-pad"
+                    style={styles.input}
+                  />
+                </View>
+              </View>
+            </ScrollView>
+            {/* Fixed footer — non-scrolling ScrollView so iOS keyboard-tap
+                handling never swallows the first tap (bug-triage FE-31). */}
+            <ScrollView
+              style={styles.sheetFooter}
+              contentContainerStyle={styles.sheetFooterContent}
+              scrollEnabled={false}
+              keyboardShouldPersistTaps="always"
+              showsVerticalScrollIndicator={false}>
+              <TouchableOpacity
+                style={[styles.confirmButton, !hasAnyValue && styles.confirmButtonDisabled]}
+                disabled={!hasAnyValue}
+                onPress={handleSave}>
+                <Text style={styles.confirmButtonText}>Save Entry</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-
-          <ScrollView style={styles.sheetBody} keyboardShouldPersistTaps="handled">
-            <Text style={styles.hint}>Leave anything blank you don&apos;t want to record.</Text>
-
-            <Text style={styles.inputLabel}>Blood Pressure (mmHg)</Text>
-            <View style={styles.row}>
-              <TextInput
-                value={systolic}
-                onChangeText={setSystolic}
-                placeholder="Systolic"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="number-pad"
-                style={[styles.input, styles.rowInput]}
-              />
-              <TextInput
-                value={diastolic}
-                onChangeText={setDiastolic}
-                placeholder="Diastolic"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="number-pad"
-                style={[styles.input, styles.rowInput]}
-              />
-            </View>
-
-            <Text style={styles.inputLabel}>Pulse (bpm)</Text>
-            <TextInput
-              value={pulseBpm}
-              onChangeText={setPulseBpm}
-              placeholder="e.g. 72"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="number-pad"
-              style={styles.input}
-            />
-
-            <Text style={styles.inputLabel}>Temperature (°C)</Text>
-            <TextInput
-              value={temperatureC}
-              onChangeText={setTemperatureC}
-              placeholder="e.g. 36.8"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="decimal-pad"
-              style={styles.input}
-            />
-
-            <View style={styles.row}>
-              <View style={styles.rowInput}>
-                <Text style={styles.inputLabel}>Height (cm)</Text>
-                <TextInput
-                  value={heightCm}
-                  onChangeText={setHeightCm}
-                  placeholder="e.g. 178"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="decimal-pad"
-                  style={styles.input}
-                />
-              </View>
-              <View style={styles.rowInput}>
-                <Text style={styles.inputLabel}>Weight (kg)</Text>
-                <TextInput
-                  value={weightKg}
-                  onChangeText={setWeightKg}
-                  placeholder="e.g. 74"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="decimal-pad"
-                  style={styles.input}
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.confirmButton, !hasAnyValue && styles.confirmButtonDisabled]}
-              disabled={!hasAnyValue}
-              onPress={handleSave}>
-              <Text style={styles.confirmButtonText}>Save Entry</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </TouchableOpacity>
     </Modal>
   );
@@ -147,7 +175,13 @@ export default function RecordVitalsModal({ visible, onClose }: RecordVitalsModa
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8, maxHeight: '85%' },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    maxHeight: '85%',
+  },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -158,7 +192,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   sheetTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  sheetBody: { paddingHorizontal: 20, paddingTop: 16 },
+  sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, flexShrink: 1 },
+  sheetFooter: { paddingHorizontal: 20, paddingTop: 8, flexGrow: 0 },
+  sheetFooterContent: { paddingBottom: 24 },
   hint: { fontSize: 13, color: '#9CA3AF', marginBottom: 16 },
   row: { flexDirection: 'row', gap: 12 },
   rowInput: { flex: 1 },

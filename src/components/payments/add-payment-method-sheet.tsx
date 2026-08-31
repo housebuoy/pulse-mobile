@@ -81,7 +81,7 @@ export default function AddPaymentMethodSheet({
 
             <ScrollView
               style={styles.sheetBody}
-              keyboardShouldPersistTaps="handled"
+              keyboardShouldPersistTaps="always"
               showsVerticalScrollIndicator={false}>
               <Text style={styles.inputLabel}>Network</Text>
               <View style={styles.networkGrid}>

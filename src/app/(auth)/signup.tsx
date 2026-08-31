@@ -17,6 +17,7 @@ import { GoogleIcon } from '@/components/ui/google-icon';
 // Static imports — dynamic ones add Metro module-resolution latency to the
 // submit tap and are a crash risk in Expo Go (bug-triage FE-8, FE-26).
 import { signup } from '@/lib/api/auth';
+import { isValidGhanaPhone, PHONE_ERROR_MESSAGE } from '@/lib/phone';
 
 export default function SignUpScreen() {
   const [showPassword, setShowPassword] = useState(false);
@@ -34,6 +35,10 @@ export default function SignUpScreen() {
     setError(null);
     if (password !== confirmPassword) {
       setError('Passwords do not match');
+      return;
+    }
+    if (!isValidGhanaPhone(phone)) {
+      setError(PHONE_ERROR_MESSAGE);
       return;
     }
     setBusy(true);
@@ -111,6 +116,7 @@ export default function SignUpScreen() {
                   placeholderTextColor="#9CA3AF"
                   className="ml-3 flex-1 text-base text-gray-900"
                   keyboardType="phone-pad"
+                  maxLength={13}
                   value={phone}
                   onChangeText={setPhone}
                 />
