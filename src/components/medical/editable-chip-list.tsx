@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
@@ -61,6 +62,26 @@ export default function EditableChipList({
   const [modalVisible, setModalVisible] = useState(false);
   const [label, setLabel] = useState('');
   const [selectedType, setSelectedType] = useState(typeOptions?.[0]?.value);
+  // FE-31: the Add button was landing flush against the keyboard's top edge,
+  // and iOS swallows first touches in that boundary zone (UIKit keyboard
+  // dismissal) BEFORE React Native sees them — hence no pressIn/handleAdd on
+  // the first tap. Lift the footer clear of the keyboard while it is open.
+  const [kbHeight, setKbHeight] = useState(0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => setKbHeight(e.endCoordinates.height)
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKbHeight(0)
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const typeLabelFor = (type?: string) => typeOptions?.find((t) => t.value === type)?.label;
 
@@ -185,13 +206,17 @@ export default function EditableChipList({
                   handling never swallows the first tap (bug-triage FE-31). */}
               <ScrollView
                 style={styles.sheetFooter}
-                contentContainerStyle={styles.sheetFooterContent}
+                contentContainerStyle={[
+                  styles.sheetFooterContent,
+                  kbHeight > 0 && styles.sheetFooterKeyboardLift,
+                ]}
                 scrollEnabled={false}
                 keyboardShouldPersistTaps="always"
                 showsVerticalScrollIndicator={false}>
                 <TouchableOpacity
                   style={[styles.confirmButton, !label.trim() && styles.confirmButtonDisabled]}
                   disabled={!label.trim()}
+                  onTouchStart={() => console.log('[chip-add] button onTouchStart')}
                   onPressIn={() => console.log('[chip-add] button pressIn')}
                   onPress={handleAdd}>
                   <Text style={styles.confirmButtonText}>Add</Text>
@@ -274,6 +299,7 @@ const styles = StyleSheet.create({
   sheetBody: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, flexShrink: 1 },
   sheetFooter: { paddingHorizontal: 20, paddingTop: 8, flexGrow: 0 },
   sheetFooterContent: { paddingBottom: 24 },
+  sheetFooterKeyboardLift: { paddingBottom: 80 },
   typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   typePill: {
     paddingVertical: 8,
