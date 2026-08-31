@@ -9,7 +9,11 @@ interface CategoryPillsProps {
 
 // Same segmented-track look as the Records tabs — one neutral gray track,
 // the active item lifted on white. No per-item color.
-export default function CategoryPills({ categories, activeCategory, onSelect }: CategoryPillsProps) {
+export default function CategoryPills({
+  categories,
+  activeCategory,
+  onSelect,
+}: CategoryPillsProps) {
   return (
     <ScrollView
       horizontal

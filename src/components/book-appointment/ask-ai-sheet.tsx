@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  ScrollView,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 import { DEPARTMENTS, DepartmentOption } from '@/constants/departments';
@@ -97,10 +105,16 @@ export default function AskAiSheet({ visible, onClose, onSelectDepartment }: Ask
                   This is a booking suggestion only, not a diagnosis. A clinician will assess you at
                   your visit.
                 </Text>
-                <TouchableOpacity style={styles.useButton} onPress={handleUseDepartment} activeOpacity={0.85}>
+                <TouchableOpacity
+                  style={styles.useButton}
+                  onPress={handleUseDepartment}
+                  activeOpacity={0.85}>
                   <Text style={styles.useButtonText}>Use this department</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.browseButton} onPress={handleClose} activeOpacity={0.7}>
+                <TouchableOpacity
+                  style={styles.browseButton}
+                  onPress={handleClose}
+                  activeOpacity={0.7}>
                   <Text style={styles.browseButtonText}>Browse departments myself</Text>
                 </TouchableOpacity>
               </View>
@@ -108,7 +122,9 @@ export default function AskAiSheet({ visible, onClose, onSelectDepartment }: Ask
 
             <View style={styles.sosNote}>
               <Ionicons name="warning-outline" size={14} color="#DC2626" />
-              <Text style={styles.sosNoteText}>For emergencies, use the SOS button instead of booking.</Text>
+              <Text style={styles.sosNoteText}>
+                For emergencies, use the SOS button instead of booking.
+              </Text>
             </View>
           </ScrollView>
         </View>
@@ -119,7 +135,13 @@ export default function AskAiSheet({ visible, onClose, onSelectDepartment }: Ask
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8, maxHeight: '85%' },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    maxHeight: '85%',
+  },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

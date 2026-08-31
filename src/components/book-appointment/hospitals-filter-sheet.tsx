@@ -83,7 +83,10 @@ export default function HospitalsFilterSheet({
           <ScrollView style={styles.sheetBody} showsVerticalScrollIndicator={false}>
             <Text style={styles.inputLabel}>Category</Text>
             <ChipGroup
-              options={[{ value: 'All', label: 'All' }, ...categoryOptions.map((opt) => ({ value: opt, label: opt }))]}
+              options={[
+                { value: 'All', label: 'All' },
+                ...categoryOptions.map((opt) => ({ value: opt, label: opt })),
+              ]}
               selected={local.category}
               onSelect={(category: string) => setLocal((prev) => ({ ...prev, category }))}
             />
@@ -92,14 +95,22 @@ export default function HospitalsFilterSheet({
             <ChipGroup
               options={DISTANCE_PRESET_OPTIONS}
               selected={local.distancePreset}
-              onSelect={(distancePreset: DistancePreset) => setLocal((prev) => ({ ...prev, distancePreset }))}
+              onSelect={(distancePreset: DistancePreset) =>
+                setLocal((prev) => ({ ...prev, distancePreset }))
+              }
             />
 
             <View style={styles.footerRow}>
-              <TouchableOpacity style={styles.clearButton} onPress={handleClear} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={handleClear}
+                activeOpacity={0.7}>
                 <Text style={styles.clearButtonText}>Clear filters</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.applyButton} onPress={handleApply} activeOpacity={0.85}>
+              <TouchableOpacity
+                style={styles.applyButton}
+                onPress={handleApply}
+                activeOpacity={0.85}>
                 <Text style={styles.applyButtonText}>Apply</Text>
               </TouchableOpacity>
             </View>
@@ -112,7 +123,13 @@ export default function HospitalsFilterSheet({
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 8, maxHeight: '85%' },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    maxHeight: '85%',
+  },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
