@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/constants/theme';
+import ResendTimer from '@/components/auth/resend-timer';
+
 
 
 interface OTPInputProps {
@@ -53,11 +55,12 @@ const OTPInput = forwardRef<TextInput, OTPInputProps>(
 
 OTPInput.displayName = 'OTPInput';
 
-
 export default function OTPScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ phone?: string }>();
+  const params = useLocalSearchParams<{ phone?: string; context?: 'signup' | 'reset' }>();
+  const isReset = params.context === 'reset';
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(0);
@@ -71,6 +74,8 @@ export default function OTPScreen() {
     useRef<TextInput>(null),
     useRef<TextInput>(null),
   ];
+  
+
 
   const handleChangeText = (text: string, index: number) => {
     const numericText = text.replace(/[^0-9]/g, '');
@@ -134,9 +139,11 @@ export default function OTPScreen() {
                 />
               </View>
               <Text style={styles.brandLabel}>PULSE</Text>
-              <Text style={styles.title}>Verify your number.</Text>
+              <Text style={styles.title}>
+                {isReset ? "Verify it's you." : 'Verify your number.'}
+              </Text>
               <Text style={styles.subtitle}>
-                We&apos;ve sent a 6-digit secure code to{'\n'}
+                We&apos;ve sent a 6-digit {isReset ? 'reset ' : 'secure '}code to{'\n'}
                 <Text style={styles.phone}>+233 24 *** ****</Text>
               </Text>
             </View>
@@ -159,17 +166,35 @@ export default function OTPScreen() {
 
             {/* VERIFY BUTTON */}
             <TouchableOpacity
-              style={[styles.verifyBtn, { backgroundColor: isComplete && !busy ? COLORS.primary : '#93C5FD' }]}
+              style={[
+                styles.verifyBtn,
+                { backgroundColor: isComplete && !busy ? COLORS.primary : '#93C5FD' },
+              ]}
               disabled={!isComplete || busy}
               onPress={async () => {
                 setBusy(true);
+                setError(null);
+                const identifier = params.phone || '';
                 try {
-                  const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+                  if (isReset) {
+                    const { verifyPasswordResetOtp } = await import('@/lib/api/auth');
+                    const { resetToken } = await verifyPasswordResetOtp(identifier, code.join(''));
+                    router.replace({
+                      pathname: '/(auth)/new-password',
+                      params: { phone: identifier, resetToken },
+                    });
+                    return;
+                  }
+
+                  const AsyncStorage = (await import('@react-native-async-storage/async-storage'))
+                    .default;
                   const { verifyOtp, login } = await import('@/lib/api/auth');
                   const { hydrateAfterLogin } = await import('@/lib/api/hydrate');
                   const pendingRaw = await AsyncStorage.getItem('pulse_pending_signup');
-                  const pending = pendingRaw ? JSON.parse(pendingRaw) as { phone: string; password: string } : null;
-                  const phone = params.phone || pending?.phone || '';
+                  const pending = pendingRaw
+                    ? (JSON.parse(pendingRaw) as { phone: string; password: string })
+                    : null;
+                  const phone = identifier || pending?.phone || '';
                   await verifyOtp(phone, code.join(''));
                   if (pending) {
                     await login(pending.phone, pending.password);
@@ -177,8 +202,12 @@ export default function OTPScreen() {
                   }
                   await hydrateAfterLogin();
                   router.replace('/(onboarding)/step1-identity');
-                } catch {
-                  router.replace('/(onboarding)/step1-identity');
+                } catch (e) {
+                  if (isReset) {
+                    setError(e instanceof Error ? e.message : 'Invalid or expired code');
+                  } else {
+                    router.replace('/(onboarding)/step1-identity');
+                  }
                 } finally {
                   setBusy(false);
                 }
@@ -186,13 +215,20 @@ export default function OTPScreen() {
               <Text style={styles.verifyText}>{busy ? 'Verifying…' : 'Verify and Continue'}</Text>
             </TouchableOpacity>
 
-            {/* RESEND */}
-            <View style={styles.resendRow}>
-              <Text style={styles.resendLabel}>Didn&apos;t receive the code?</Text>
-              <TouchableOpacity>
-                <Text style={styles.resendLink}>Resend Code in 0:59</Text>
-              </TouchableOpacity>
-            </View>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            <ResendTimer
+              onResend={async () => {
+                const identifier = params.phone || '';
+                if (isReset) {
+                  const { requestPasswordReset } = await import('@/lib/api/auth');
+                  await requestPasswordReset(identifier);
+                } else {
+                  const { resendOtp } = await import('@/lib/api/auth'); // adjust to your real fn
+                  await resendOtp(identifier);
+                }
+              }}
+            />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -274,6 +310,13 @@ const styles = StyleSheet.create({
   // Button
   verifyBtn: { marginBottom: 32, alignItems: 'center', borderRadius: 16, paddingVertical: 16 },
   verifyText: { fontSize: 17, fontWeight: '700', color: '#fff' },
+  errorText: {
+    marginTop: -16,
+    marginBottom: 24,
+    textAlign: 'center',
+    fontSize: 13,
+    color: '#EF4444',
+  },
 
   // Resend
   resendRow: { marginTop: 'auto', alignItems: 'center', gap: 8, paddingBottom: 32 },

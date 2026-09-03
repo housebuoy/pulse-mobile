@@ -53,3 +53,74 @@ export async function verifyOtp(phone: string, code: string): Promise<void> {
     body: { phone, code },
   });
 }
+
+export async function resendOtp(phone: string): Promise<void> {
+  if (isMockMode()) {
+    await delay(400);
+    return;
+  }
+  await apiRequest('/auth/patient/resend-otp', {
+    method: 'POST',
+    auth: false,
+    body: { phone },
+  });
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// --- Password reset (FE-mocked) ---
+// BACKEND_SPEC (BE-11): three patient/staff-scoped endpoints are needed —
+// request-reset, verify, and set-new-password — distinct from the
+// logged-in change-password endpoint. None of these exist server-side yet;
+// everything below resolves against mock data until BE-11 ships, same as
+// the rest of the app's isMockMode() calls.
+//
+// Identifier type is TBD with the backend owner — phone is used here per
+// the Ghana SMS-OTP norm the rest of auth already follows (see login/signup).
+// It's passed through as an opaque string so swapping to email/Ghana-Card
+// later is a one-line change at the call sites, not here.
+
+export async function requestPasswordReset(identifier: string): Promise<void> {
+  if (isMockMode()) {
+    await delay(600);
+    return;
+  }
+  await apiRequest('/auth/patient/password-reset/request', {
+    method: 'POST',
+    auth: false,
+    body: { identifier },
+  });
+}
+
+export async function verifyPasswordResetOtp(
+  identifier: string,
+  code: string
+): Promise<{ resetToken: string }> {
+  if (isMockMode()) {
+    await delay(500);
+    return { resetToken: 'mock-reset-token' };
+  }
+  return apiRequest('/auth/patient/password-reset/verify', {
+    method: 'POST',
+    auth: false,
+    body: { identifier, code },
+  });
+}
+
+export async function resetPassword(input: {
+  identifier: string;
+  resetToken: string;
+  newPassword: string;
+}): Promise<void> {
+  if (isMockMode()) {
+    await delay(600);
+    return;
+  }
+  await apiRequest('/auth/patient/password-reset/confirm', {
+    method: 'POST',
+    auth: false,
+    body: input,
+  });
+}
