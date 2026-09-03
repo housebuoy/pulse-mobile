@@ -131,7 +131,7 @@ export default function HomeScreen() {
             title="Recent Visits"
             iconName="time-outline"
             actionText="See All"
-            onActionPress={() => {}}
+            onActionPress={() => router.push("/(tabs)/records")}
           />
           <ScrollView
             horizontal
