@@ -88,7 +88,7 @@ export default function HomeScreen() {
               currentNumber={ticket.currentNumber}
               userNumber={ticket.userNumber}
               estimatedTime={ticket.estimatedTime}
-              // onViewDetails={() => router.push('/(tabs)/queue')}
+              onViewDetails={() => router.push("/(tabs)/queue")}
             />
           )}
 
