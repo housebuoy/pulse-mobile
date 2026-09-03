@@ -19,18 +19,18 @@ npx expo start         # dev server; press a for Android emulator, i for iOS
 
 ## Environment (`.env` — copy from `.env.example`)
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `EXPO_PUBLIC_API_URL` | `http://localhost:8080/api` | Backend base URL. Android emulator: `http://10.0.2.2:8080/api`; physical device: your machine's LAN IP; live backend: `https://pulse-o3gj.onrender.com/api` |
-| `EXPO_PUBLIC_USE_MOCK` | unset → **mock mode** | Run on store seeds. Set to `false` to call the real API |
+| Variable               | Default                     | Meaning                                                                                                                                                     |
+| ---------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EXPO_PUBLIC_API_URL`  | `http://localhost:8080/api` | Backend base URL. Android emulator: `http://10.0.2.2:8080/api`; physical device: your machine's LAN IP; live backend: `https://pulse-o3gj.onrender.com/api` |
+| `EXPO_PUBLIC_USE_MOCK` | unset → **mock mode**       | Run on store seeds. Set to `false` to call the real API                                                                                                     |
 
 > ⚠️ Mock mode is the default: the app shows seeded data until
 > `EXPO_PUBLIC_USE_MOCK=false` is set (same pattern as `pulse-web`).
 
 ## Demo credentials (live backend)
 
-| Role | Identifier | Password |
-|---|---|---|
+| Role    | Identifier | Password     |
+| ------- | ---------- | ------------ |
 | Patient | `PT-00101` | `patient123` |
 
 Login uses `{identifier, password}` → JWT directly (no OTP step for login;
