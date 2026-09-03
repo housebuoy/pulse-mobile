@@ -17,24 +17,26 @@
         {
           "photosPermission": "Pulse uses your photo library to attach a picture of your insurance card."
         }
-      ]
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icons/splash-icon-dark.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "imageWidth": 200,
+          "dark": {
+            "image": "./assets/icons/splash-icon-light.png",
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-status-bar"
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/icons/splash-icon-dark.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
-      "dark": {
-        "image": "./assets/icons/splash-icon-light.png",
-        "backgroundColor": "#000000"
-      },
-      "imageWidth": 200
-    },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "icon": {
