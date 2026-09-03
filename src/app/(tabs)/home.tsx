@@ -15,12 +15,14 @@ import UpcomingAppointmentCard from '@/components/cards/upcoming-card';
 import IconButton from '@/components/ui/header-badge';
 import { useQueueStore } from '@/stores/queue-store';
 import { useProfileStore } from '@/stores/profile-store';
+import { selectUnreadCount, useNotificationsStore } from '@/stores/notifications-store';
 
 export default function HomeScreen() {
   const router = useRouter();
   const ticket = useQueueStore((state) => state.ticket);
   const setTicket = useQueueStore((state) => state.setTicket);
   const identity = useProfileStore((state) => state.identity);
+  const unreadNotifications = useNotificationsStore(selectUnreadCount);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,8 +69,8 @@ export default function HomeScreen() {
         </View>
         <IconButton
           icon="notifications-outline"
-          badge={true}
-          // onPress={() => router.push('/notifications')}
+          badge={unreadNotifications > 0}
+          onPress={() => router.push('/(screens)/notifications')}
         />
       </View>
 

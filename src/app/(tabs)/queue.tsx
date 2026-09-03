@@ -10,11 +10,13 @@ import InstructionList from '../../components/queue/instruction-list';
 import IconButton from '@/components/ui/header-badge';
 import SectionHeader from '@/components/shared/section-header';
 import { useQueueStore } from '@/stores/queue-store';
+import { selectUnreadCount, useNotificationsStore } from '@/stores/notifications-store';
 
 export default function QueueScreen() {
   const router = useRouter();
   const ticket = useQueueStore((state) => state.ticket);
   const setTicket = useQueueStore((state) => state.setTicket);
+  const unreadNotifications = useNotificationsStore(selectUnreadCount);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,7 +99,8 @@ export default function QueueScreen() {
 
         <IconButton
           icon="notifications-outline"
-          badge={true}
+          badge={unreadNotifications > 0}
+          onPress={() => router.push('/(screens)/notifications')}
         />
       </View>
 
