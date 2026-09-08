@@ -9,6 +9,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
@@ -23,14 +24,17 @@ const NETWORK_OPTIONS: { value: PaymentNetwork; label: string }[] = [
 
 const CARD_BRANDS = ['Visa', 'Mastercard'];
 
+const GHANA_MOMO_RE = /^0\d{9}$/; // 0200433286
+
 interface AddPaymentMethodSheetProps {
   visible: boolean;
   onClose: () => void;
   onAdded?: (methodId: string) => void;
 }
 
-// Mock add flow — only ever collects the last 4 digits (a display aid) and
-// never a full card/MoMo number, PIN, or CVV. See payments-store.ts for why.
+// MoMo wallets save the full 10-digit wallet number (it is a phone number,
+// shown in full — the method's identifier). Cards still collect only the
+// last 4 digits as a display aid; never a PAN/PIN/CVV.
 export default function AddPaymentMethodSheet({
   visible,
   onClose,
@@ -41,12 +45,16 @@ export default function AddPaymentMethodSheet({
 
   const [network, setNetwork] = useState<PaymentNetwork>('mtn_momo');
   const [brand, setBrand] = useState('Visa');
-  const [last4, setLast4] = useState('');
+  const [digits, setDigits] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const isCard = network === 'card';
 
   const reset = () => {
     setNetwork('mtn_momo');
     setBrand('Visa');
-    setLast4('');
+    setDigits('');
+    setSaving(false);
   };
 
   const handleClose = () => {
@@ -54,15 +62,25 @@ export default function AddPaymentMethodSheet({
     onClose();
   };
 
-  const isValid = last4.trim().length === 4;
+  const isValid = isCard ? digits.length === 4 : GHANA_MOMO_RE.test(digits);
 
-  const handleSave = () => {
-    if (!isValid) return;
-    addPaymentMethod(network, last4.trim(), network === 'card' ? brand : undefined);
-    const newest = usePaymentsStore.getState().paymentMethods.at(-1);
-    reset();
-    onClose();
-    if (newest) onAdded?.(newest.id);
+  const handleSave = async () => {
+    if (!isValid || saving) return;
+    setSaving(true);
+    try {
+      await addPaymentMethod(network, digits.trim(), isCard ? brand : undefined);
+      const newest = usePaymentsStore.getState().paymentMethods.at(-1);
+      reset();
+      onClose();
+      if (newest) onAdded?.(newest.id);
+    } catch {
+      Alert.alert(
+        'Could not save method',
+        'Please check the number and try again.',
+        [{ text: 'OK' }]
+      );
+      setSaving(false);
+    }
   };
 
   return (
@@ -128,31 +146,38 @@ export default function AddPaymentMethodSheet({
               )}
 
               <Text style={[styles.inputLabel, { marginTop: 16 }]}>
-                Last 4 Digits{' '}
+                {isCard ? 'Last 4 Digits' : 'Mobile Money Number'}{' '}
                 <Text style={styles.inputLabelHint}>
-                  ({network === 'card' ? 'of your card' : 'of your mobile number'})
+                  ({isCard ? 'of your card' : 'your 10-digit wallet number'})
                 </Text>
               </Text>
               <TextInput
-                value={last4}
-                onChangeText={(text) => setLast4(text.replace(/[^0-9]/g, '').slice(0, 4))}
-                placeholder="e.g. 4567"
+                value={digits}
+                onChangeText={(text) =>
+                  setDigits(text.replace(/[^0-9]/g, '').slice(0, isCard ? 4 : 10))
+                }
+                placeholder={isCard ? 'e.g. 4567' : 'e.g. 0200433286'}
                 placeholderTextColor="#9CA3AF"
                 keyboardType="number-pad"
-                maxLength={4}
+                maxLength={isCard ? 4 : 10}
                 style={styles.input}
               />
               <Text style={styles.hint}>
-                We never ask for or store your full number, PIN, or CVV — just enough to help you
-                recognize this method later.
+                {isCard
+                  ? 'We never ask for or store your full card number, PIN, or CVV — just enough to help you recognize this method later.'
+                  : 'Your wallet number is how this method is identified. We store it in full so charges go to the right wallet.'}
               </Text>
 
               <TouchableOpacity
-                style={[styles.confirmButton, !isValid && styles.confirmButtonDisabled]}
-                disabled={!isValid}
+                style={[styles.confirmButton, (!isValid || saving) && styles.confirmButtonDisabled]}
+                disabled={!isValid || saving}
                 onPress={handleSave}>
                 <Text style={styles.confirmButtonText}>
-                  {paymentMethods.length === 0 ? 'Save as Default' : 'Save Method'}
+                  {saving
+                    ? 'Saving…'
+                    : paymentMethods.length === 0
+                      ? 'Save as Default'
+                      : 'Save Method'}
                 </Text>
               </TouchableOpacity>
             </ScrollView>

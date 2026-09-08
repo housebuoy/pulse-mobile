@@ -1,12 +1,35 @@
-import { format, parse } from 'date-fns';
 import { isMockMode } from '@/lib/use-mock';
 import { apiRequest } from '@/lib/api/client';
+import { format, parse } from 'date-fns';
 import {
   fetchMockAvailability,
   HospitalAvailability,
   DaySlots,
   MockTimeSlot,
 } from '@/services/mock/hospital-schedule';
+
+/** Minimal doctor shape from GET /departments/{id}/doctors (backend PR #51). */
+export interface DoctorOption {
+  id: number;
+  firstName?: string;
+  lastName?: string;
+  specialization?: string;
+  email?: string | null;
+  phone?: string | null;
+  departmentId?: number;
+  hospitalId?: number | null;
+  /** Server-computed: doctor is resolvable by a mobile booking (staff-linked). */
+  bookableOnline: boolean;
+}
+
+export async function listDepartmentDoctors(departmentId: number | string): Promise<DoctorOption[]> {
+  if (isMockMode()) return [];
+  const page = await apiRequest<{ content?: DoctorOption[] } | DoctorOption[]>(
+    `/departments/${departmentId}/doctors?size=100`
+  );
+  const rows = Array.isArray(page) ? page : (page.content ?? []);
+  return rows;
+}
 
 export interface HospitalCard {
   id: string;

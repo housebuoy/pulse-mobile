@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 
@@ -25,10 +25,14 @@ export default function HomeScreen() {
   const unreadNotifications = useNotificationsStore(selectUnreadCount);
   const syncUnreadCount = useNotificationsStore((state) => state.syncUnreadCount);
 
-  // Keep the bell badge in sync with the backend unread count.
-  useEffect(() => {
-    void syncUnreadCount();
-  }, [syncUnreadCount]);
+  // Keep the bell badge in sync with the backend unread count — on mount AND
+  // on every Home focus, so returning from other tabs/screens refreshes the
+  // badge without an app restart.
+  useFocusEffect(
+    useCallback(() => {
+      void syncUnreadCount();
+    }, [syncUnreadCount])
+  );
 
   useEffect(() => {
     let cancelled = false;

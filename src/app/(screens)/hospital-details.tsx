@@ -20,7 +20,6 @@ import TimeSlotPicker, { TimeSlot } from '@/components/book-appointment/time-slo
 import AskAiSheet from '@/components/book-appointment/ask-ai-sheet';
 import Divider from '@/components/ui/divider';
 import Dropdown, { DropdownOption } from '@/components/ui/dropdown-menu';
-import type { DepartmentOption } from '@/lib/api/discovery';
 import { DEPARTMENTS } from '@/constants/departments';
 import { HospitalAvailability } from '@/services/mock/hospital-schedule';
 import { useBookingStore } from '@/stores/booking-store';
@@ -103,19 +102,37 @@ export default function HospitalDetailsScreen() {
   }, [setFacility, HOSPITAL.name, HOSPITAL.location, HOSPITAL.id]);
 
   useEffect(() => {
-    import('@/lib/api/discovery').then(({ listDepartments }) =>
-      listDepartments(HOSPITAL.id).then((rows: DepartmentOption[]) => {
-        setDeptOptions(rows.map((d) => ({ label: d.name, value: String(d.id) })));
-        const map: Record<string, number> = {};
-        const doctors: Record<string, boolean> = {};
-        rows.forEach((d) => {
-          map[String(d.id)] = d.id;
-          doctors[String(d.id)] = d.hasDoctors !== false;
-        });
-        setDeptMap(map);
-        setDeptDoctors(doctors);
-      })
-    );
+    let cancelled = false;
+    import('@/lib/api/discovery').then(async ({ listDepartments, listDepartmentDoctors }) => {
+      const rows = await listDepartments(HOSPITAL.id);
+      if (cancelled) return;
+      setDeptOptions(rows.map((d) => ({ label: d.name, value: String(d.id) })));
+      const map: Record<string, number> = {};
+      rows.forEach((d) => {
+        map[String(d.id)] = d.id;
+      });
+      setDeptMap(map);
+
+      // The backend flags bookableOnline per doctor (staff-linked check done
+      // server-side, PR #51) — a department is only bookable if at least one
+      // doctor passes, otherwise the booking 409s.
+      const linked: Record<string, boolean> = {};
+      await Promise.all(
+        rows.map(async (d) => {
+          try {
+            const doctors = await listDepartmentDoctors(d.id);
+            linked[String(d.id)] = doctors.some((doc) => doc.bookableOnline);
+          } catch {
+            // Fall back to the department flag if the doctor list is unavailable.
+            linked[String(d.id)] = d.hasDoctors !== false;
+          }
+        })
+      );
+      if (!cancelled) setDeptDoctors(linked);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [HOSPITAL.id]);
 
   // --- Calendar cursor (which month is displayed) stays local UI state ---
@@ -394,7 +411,26 @@ export default function HospitalDetailsScreen() {
               setSubmitting(false);
             } catch (e) {
               setSubmitting(false);
-              alert(e instanceof Error ? e.message : 'Booking failed');
+              // 409 means the backend disagrees about slot availability —
+              // refresh so the slots reflect reality instead of leaving the
+              // patient tapping a stale "available" time.
+              const { ApiError } = await import('@/lib/api/client');
+              if (e instanceof ApiError && e.status === 409) {
+                try {
+                  const { getAvailability } = await import('@/lib/api/discovery');
+                  const deptId2 = useBookingStore.getState().departmentId ?? Number(department);
+                  const refreshed = await getAvailability(deptId2, selectedDate, 1);
+                  setAvailability(refreshed);
+                } catch {
+                  /* keep old availability */
+                }
+                setSelectedTime(null);
+              }
+              Alert.alert(
+                'Booking failed',
+                e instanceof Error ? e.message : 'Please try another time slot.',
+                [{ text: 'OK' }]
+              );
             }
           }}>
           {submitting ? (
