@@ -8,34 +8,18 @@ import {
   MockTimeSlot,
 } from '@/services/mock/hospital-schedule';
 
-/** Minimal doctor shape needed for the online-booking eligibility check. */
+/** Minimal doctor shape from GET /departments/{id}/doctors (backend PR #51). */
 export interface DoctorOption {
   id: number;
-  name?: string;
+  firstName?: string;
+  lastName?: string;
+  specialization?: string;
   email?: string | null;
-  hospital?: { id?: number | null } | null;
+  phone?: string | null;
+  departmentId?: number;
   hospitalId?: number | null;
-}
-
-/**
- * Mirrors the backend pickDoctor eligibility rule as far as the patient API
- * exposes it: a doctor is bookable online only if they have an email and are
- * attached to the hospital the department belongs to. (The backend additionally
- * requires a matching DOCTOR-role staff record, which is not visible to the
- * patient API — this is the closest client-side equivalent.)
- */
-export function isStaffLinkedDoctor(
-  doctor: DoctorOption,
-  hospitalId: number | string
-): boolean {
-  const hid = typeof hospitalId === 'string' ? Number(hospitalId) : hospitalId;
-  const docHospitalId = doctor.hospital?.id ?? doctor.hospitalId ?? null;
-  return (
-    !!doctor.email &&
-    doctor.email.trim().length > 0 &&
-    docHospitalId != null &&
-    Number(docHospitalId) === hid
-  );
+  /** Server-computed: doctor is resolvable by a mobile booking (staff-linked). */
+  bookableOnline: boolean;
 }
 
 export async function listDepartmentDoctors(departmentId: number | string): Promise<DoctorOption[]> {
