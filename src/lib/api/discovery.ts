@@ -1,12 +1,51 @@
-import { format, parse } from 'date-fns';
 import { isMockMode } from '@/lib/use-mock';
 import { apiRequest } from '@/lib/api/client';
+import { format, parse } from 'date-fns';
 import {
   fetchMockAvailability,
   HospitalAvailability,
   DaySlots,
   MockTimeSlot,
 } from '@/services/mock/hospital-schedule';
+
+/** Minimal doctor shape needed for the online-booking eligibility check. */
+export interface DoctorOption {
+  id: number;
+  name?: string;
+  email?: string | null;
+  hospital?: { id?: number | null } | null;
+  hospitalId?: number | null;
+}
+
+/**
+ * Mirrors the backend pickDoctor eligibility rule as far as the patient API
+ * exposes it: a doctor is bookable online only if they have an email and are
+ * attached to the hospital the department belongs to. (The backend additionally
+ * requires a matching DOCTOR-role staff record, which is not visible to the
+ * patient API — this is the closest client-side equivalent.)
+ */
+export function isStaffLinkedDoctor(
+  doctor: DoctorOption,
+  hospitalId: number | string
+): boolean {
+  const hid = typeof hospitalId === 'string' ? Number(hospitalId) : hospitalId;
+  const docHospitalId = doctor.hospital?.id ?? doctor.hospitalId ?? null;
+  return (
+    !!doctor.email &&
+    doctor.email.trim().length > 0 &&
+    docHospitalId != null &&
+    Number(docHospitalId) === hid
+  );
+}
+
+export async function listDepartmentDoctors(departmentId: number | string): Promise<DoctorOption[]> {
+  if (isMockMode()) return [];
+  const page = await apiRequest<{ content?: DoctorOption[] } | DoctorOption[]>(
+    `/departments/${departmentId}/doctors?size=100`
+  );
+  const rows = Array.isArray(page) ? page : (page.content ?? []);
+  return rows;
+}
 
 export interface HospitalCard {
   id: string;
