@@ -129,7 +129,25 @@ export async function getPaymentMethods(): Promise<PaymentMethod[]> {
     const { usePaymentsStore } = await import('@/stores/payments-store');
     return usePaymentsStore.getState().paymentMethods;
   }
-  return apiRequest('/patients/me/payment-methods');
+  const rows = await apiRequest<PaymentMethod[]>('/patients/me/payment-methods');
+  return rows;
+}
+
+/**
+ * Persists a payment method on the backend (real path only). MoMo wallets
+ * send the full 10-digit accountNumber; cards send last4. Backend derives
+ * the display label and the last-4 badge; the created row (with server id)
+ * is what checkout expects.
+ */
+export async function addPaymentMethodApi(input: {
+  network: string;
+  last4?: string;
+  accountNumber?: string;
+}): Promise<PaymentMethod> {
+  return apiRequest<PaymentMethod>('/patients/me/payment-methods', {
+    method: 'POST',
+    body: input,
+  });
 }
 
 export async function getPaymentHistory(): Promise<PaymentHistoryEntry[]> {
