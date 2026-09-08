@@ -66,6 +66,10 @@ export default function HomeScreen() {
   const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const refreshing = useRef(false);
+  const heroListRef = useRef<FlatList<HeroPage>>(null);
+  // Timestamp of the last manual swipe — autoplay backs off right after so it
+  // never fights the user's finger.
+  const lastDragAt = useRef(0);
 
   const refresh = useCallback(async () => {
     if (refreshing.current) return;
@@ -135,6 +139,36 @@ export default function HomeScreen() {
   // Clamp the carousel position when the page list shrinks (no setState-in-effect).
   const shownIndex = pages.length === 0 ? 0 : Math.min(heroIndex, pages.length - 1);
 
+  // Guide-style gentle auto-advance: every 5s move to the next page, but back
+  // off for a few seconds after a manual swipe so autoplay never yanks the
+  // carousel out from under the user's finger.
+  useEffect(() => {
+    if (pages.length <= 1) return;
+    const id = setInterval(() => {
+      if (Date.now() - lastDragAt.current < 6000) return;
+      const next = (shownIndex + 1) % pages.length;
+      heroListRef.current?.scrollToOffset({
+        offset: next * cardWidth,
+        animated: true,
+      });
+      setHeroIndex(next);
+    }, 5000);
+    return () => clearInterval(id);
+  }, [pages.length, shownIndex, cardWidth]);
+
+  const getItemLayout = useCallback(
+    (_: ArrayLike<HeroPage> | null | undefined, index: number) => ({
+      length: cardWidth,
+      offset: cardWidth * index,
+      index,
+    }),
+    [cardWidth]
+  );
+
+  const onScrollBeginDrag = () => {
+    lastDragAt.current = Date.now();
+  };
+
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / cardWidth);
     if (idx !== heroIndex) setHeroIndex(idx);
@@ -199,6 +233,7 @@ export default function HomeScreen() {
           {pages.length > 0 ? (
             <>
               <FlatList
+                ref={heroListRef}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
@@ -209,14 +244,25 @@ export default function HomeScreen() {
                 renderItem={renderPage}
                 snapToInterval={cardWidth}
                 decelerationRate="fast"
+                getItemLayout={getItemLayout}
+                onScrollBeginDrag={onScrollBeginDrag}
                 onMomentumScrollEnd={onScrollEnd}
                 style={{ width: cardWidth }}
               />
               {pages.length > 1 && (
                 <View style={styles.dotsRow}>
                   {pages.map((p, i) => (
-                    <View
+                    <TouchableOpacity
                       key={p.kind === 'live' ? `dot-live-${i}` : `dot-${p.booking.id}`}
+                      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                      onPress={() => {
+                        lastDragAt.current = Date.now();
+                        heroListRef.current?.scrollToOffset({
+                          offset: i * cardWidth,
+                          animated: true,
+                        });
+                        setHeroIndex(i);
+                      }}
                       style={[styles.dot, i === shownIndex && styles.dotActive]}
                     />
                   ))}
