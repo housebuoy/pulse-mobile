@@ -1,6 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
 
 export interface QueueTicket {
   hospitalName: string;
@@ -11,35 +9,39 @@ export interface QueueTicket {
   waitTimeMins: number;
   roomNumber: string;
   estimatedTime: string;
+  // Live-queue position + booking link (backend QueueTicketResponse).
+  // Optional so an older backend payload (pre-deploy) still parses.
+  bookingId?: number | null;
+  bookingReference?: string | null;
+  queueTotal?: number;
+  aheadCount?: number;
+  servedCount?: number;
 }
 
 interface QueueState {
   ticket: QueueTicket;
   setTicket: (ticket: QueueTicket) => void;
+  clearTicket: () => void;
 }
 
-// Seeded with today's demo ticket so both Home and Queue render the same
-// values they did before this store existed.
-const DEFAULT_TICKET: QueueTicket = {
-  hospitalName: 'KNUST University Hospital',
-  department: 'General OPD',
-  doctorName: 'Dr. Arhin',
-  currentNumber: 4,
-  userNumber: 12,
-  waitTimeMins: 45,
-  roomNumber: '302',
-  estimatedTime: '10:15 AM',
+// Empty ticket = "no active queue". Screens treat an empty hospitalName as
+// the inactive state (hasActiveQueue). NOT persisted: a live ticket is
+// ephemeral state that refetches every poll, and persisting it caused stale
+// cards from a previous login/session to linger after the backend stopped
+// returning a ticket (the KNUST/Dr. Boateng card on Marvinphil's Home).
+const EMPTY_TICKET: QueueTicket = {
+  hospitalName: '',
+  department: '',
+  doctorName: '',
+  currentNumber: 0,
+  userNumber: 0,
+  waitTimeMins: 0,
+  roomNumber: '',
+  estimatedTime: '',
 };
 
-export const useQueueStore = create<QueueState>()(
-  persist(
-    (set) => ({
-      ticket: DEFAULT_TICKET,
-      setTicket: (ticket) => set({ ticket }),
-    }),
-    {
-      name: 'pulse-queue-store',
-      storage: createJSONStorage(() => AsyncStorage),
-    }
-  )
-);
+export const useQueueStore = create<QueueState>()((set) => ({
+  ticket: EMPTY_TICKET,
+  setTicket: (ticket) => set({ ticket }),
+  clearTicket: () => set({ ticket: EMPTY_TICKET }),
+}));
