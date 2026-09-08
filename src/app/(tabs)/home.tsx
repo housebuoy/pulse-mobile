@@ -23,6 +23,12 @@ export default function HomeScreen() {
   const setTicket = useQueueStore((state) => state.setTicket);
   const identity = useProfileStore((state) => state.identity);
   const unreadNotifications = useNotificationsStore(selectUnreadCount);
+  const syncUnreadCount = useNotificationsStore((state) => state.syncUnreadCount);
+
+  // Keep the bell badge in sync with the backend unread count.
+  useEffect(() => {
+    void syncUnreadCount();
+  }, [syncUnreadCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,6 +114,14 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false} 
             contentContainerStyle={styles.pillContainer}
           >
+            <TouchableOpacity
+              style={styles.actionPill}
+              onPress={() => router.push('/(screens)/my-appointments')}
+              activeOpacity={0.7}>
+              <Ionicons name="calendar-outline" size={16} color={COLORS.primary} />
+              <Text style={styles.actionPillText}>My Appointments</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity style={styles.actionPill}>
               <Ionicons name="flask-outline" size={16} color={COLORS.primary} />
               <Text style={styles.actionPillText}>Lab Results</Text>
