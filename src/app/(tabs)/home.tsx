@@ -175,36 +175,44 @@ export default function HomeScreen() {
   };
 
   const renderPage = ({ item }: { item: HeroPage }) => {
+    // Each page is exactly one card-width wide; without this the FlatList
+    // items shrink-wrap their content and the next card peeks in beside the
+    // current one ("stacked together"). Pinning the width makes paging land
+    // exactly one card per swipe.
     if (item.kind === 'live') {
       return (
-        <LiveQueueCard
-          variant="home"
-          hospitalName={item.ticket.hospitalName}
-          department={item.ticket.department}
-          doctorName={item.ticket.doctorName}
-          waitTimeMins={item.ticket.waitTimeMins}
-          currentNumber={item.ticket.currentNumber}
-          userNumber={item.ticket.userNumber}
-          estimatedTime={item.ticket.estimatedTime}
-          bookingReference={item.ticket.bookingReference}
-          queueTotal={item.ticket.queueTotal}
-          aheadCount={item.ticket.aheadCount}
-          servedCount={item.ticket.servedCount}
-          onViewDetails={() => router.push('/(tabs)/queue')}
-        />
+        <View style={{ width: cardWidth }}>
+          <LiveQueueCard
+            variant="home"
+            hospitalName={item.ticket.hospitalName}
+            department={item.ticket.department}
+            doctorName={item.ticket.doctorName}
+            waitTimeMins={item.ticket.waitTimeMins}
+            currentNumber={item.ticket.currentNumber}
+            userNumber={item.ticket.userNumber}
+            estimatedTime={item.ticket.estimatedTime}
+            bookingReference={item.ticket.bookingReference}
+            queueTotal={item.ticket.queueTotal}
+            aheadCount={item.ticket.aheadCount}
+            servedCount={item.ticket.servedCount}
+            onViewDetails={() => router.push('/(tabs)/queue')}
+          />
+        </View>
       );
     }
     const when = fmtWhen(item.booking.scheduledAt);
     return (
-      <UpcomingAppointmentCard
-        hospitalName={item.booking.hospitalName ?? ''}
-        department={item.booking.departmentName}
-        doctorName={item.booking.doctorName}
-        date={when.date}
-        time={when.time}
-        reference={item.booking.reference}
-        paymentStatus={item.booking.paymentStatus}
-      />
+      <View style={{ width: cardWidth }}>
+        <UpcomingAppointmentCard
+          hospitalName={item.booking.hospitalName ?? ''}
+          department={item.booking.departmentName}
+          doctorName={item.booking.doctorName}
+          date={when.date}
+          time={when.time}
+          reference={item.booking.reference}
+          paymentStatus={item.booking.paymentStatus}
+        />
+      </View>
     );
   };
 
