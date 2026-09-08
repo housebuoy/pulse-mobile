@@ -103,7 +103,7 @@ export default function HospitalDetailsScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    import('@/lib/api/discovery').then(async ({ listDepartments, listDepartmentDoctors, isStaffLinkedDoctor }) => {
+    import('@/lib/api/discovery').then(async ({ listDepartments, listDepartmentDoctors }) => {
       const rows = await listDepartments(HOSPITAL.id);
       if (cancelled) return;
       setDeptOptions(rows.map((d) => ({ label: d.name, value: String(d.id) })));
@@ -113,16 +113,15 @@ export default function HospitalDetailsScreen() {
       });
       setDeptMap(map);
 
-      // hasDoctors only means "department has any doctor row" — the backend
-      // pickDoctor additionally requires staff-linked doctors, without which
-      // booking 409s. Check the actual doctor list per department so the
-      // patient never reaches a guaranteed-409 booking flow.
+      // The backend flags bookableOnline per doctor (staff-linked check done
+      // server-side, PR #51) — a department is only bookable if at least one
+      // doctor passes, otherwise the booking 409s.
       const linked: Record<string, boolean> = {};
       await Promise.all(
         rows.map(async (d) => {
           try {
             const doctors = await listDepartmentDoctors(d.id);
-            linked[String(d.id)] = doctors.some((doc) => isStaffLinkedDoctor(doc, HOSPITAL.id));
+            linked[String(d.id)] = doctors.some((doc) => doc.bookableOnline);
           } catch {
             // Fall back to the department flag if the doctor list is unavailable.
             linked[String(d.id)] = d.hasDoctors !== false;
