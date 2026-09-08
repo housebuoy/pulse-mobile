@@ -19,10 +19,21 @@ const STATUS_BADGES: Record<AppointmentStatus, StatusBadge> = {
 };
 
 const PAID_BADGE: StatusBadge = { label: 'Paid', bg: '#DCFCE7', color: '#16A34A' };
-const UNPAID_BADGE: StatusBadge = { label: 'Unpaid', bg: '#FEF3C7', color: '#D97706' };
+const PENDING_BADGE: StatusBadge = { label: 'Unpaid', bg: '#FEF3C7', color: '#D97706' };
+const FAILED_BADGE: StatusBadge = { label: 'Payment failed', bg: '#FEE2E2', color: '#DC2626' };
+const REFUNDED_BADGE: StatusBadge = { label: 'Refunded', bg: '#E5E7EB', color: '#374151' };
 
 function paymentBadge(status: PatientAppointment['paymentStatus']): StatusBadge {
-  return status === 'paid' ? PAID_BADGE : UNPAID_BADGE;
+  switch (status) {
+    case 'paid':
+      return PAID_BADGE;
+    case 'failed':
+      return FAILED_BADGE;
+    case 'refunded':
+      return REFUNDED_BADGE;
+    default:
+      return PENDING_BADGE;
+  }
 }
 
 function Badge({ badge }: { badge: StatusBadge }) {
