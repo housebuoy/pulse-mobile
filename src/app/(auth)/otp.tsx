@@ -57,8 +57,16 @@ OTPInput.displayName = 'OTPInput';
 
 export default function OTPScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ phone?: string; context?: 'signup' | 'reset' }>();
+  const params = useLocalSearchParams<{
+    phone?: string;
+    context?: 'signup' | 'reset';
+    devOtp?: string;
+  }>();
   const isReset = params.context === 'reset';
+  // Shown ONLY when the backend echoed a dev code (otp.dev-mode=true). Real
+  // production responses never include devOtp, so this banner never appears
+  // outside dev-echo environments.
+  const devCode = params.devOtp && /^\d{6}$/.test(params.devOtp) ? params.devOtp : null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,6 +171,21 @@ export default function OTPScreen() {
                 />
               ))}
             </View>
+
+            {/* DEV-ECHO BANNER — only when the backend echoed a dev code */}
+            {devCode ? (
+              <View style={styles.devBanner}>
+                <View style={styles.devBannerTextWrap}>
+                  <Text style={styles.devBannerTitle}>DEV MODE · code: {devCode}</Text>
+                  <Text style={styles.devBannerSub}>No SMS was sent — enter the code above</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.devFillBtn}
+                  onPress={() => handleChangeText(devCode, 0)}>
+                  <Text style={styles.devFillText}>Fill</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
             {/* VERIFY BUTTON */}
             <TouchableOpacity
@@ -297,6 +320,32 @@ const styles = StyleSheet.create({
   },
   otpBoxActive: { borderColor: COLORS.primary, backgroundColor: '#fff' },
   otpBoxInactive: { borderColor: '#F3F4F6', backgroundColor: '#F9FAFB' },
+
+  // Dev-echo banner
+  devBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: -24,
+    marginBottom: 20,
+  },
+  devBannerTextWrap: { flex: 1, paddingRight: 8 },
+  devBannerTitle: { fontSize: 13, fontWeight: '800', color: '#9A3412' },
+  devBannerSub: { fontSize: 11, color: '#C2410C', marginTop: 2 },
+  devFillBtn: {
+    backgroundColor: '#EA580C',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  devFillText: { color: '#fff', fontSize: 13, fontWeight: '800' },
   otpInput: {
     width: '100%',
     textAlign: 'center',
