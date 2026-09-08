@@ -13,6 +13,7 @@ export type AppointmentPaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded
 export interface PatientAppointment {
   id: string;
   reference: string;
+  hospitalName?: string | null;
   departmentName: string;
   doctorName: string;
   scheduledAt: string; // ISO datetime
