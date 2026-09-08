@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 
@@ -69,9 +70,25 @@ export default function LiveQueueCard({
       ? ` · ${queueTotal} in queue`
       : '';
   const isHome = variant === 'home';
+  const gradientColors: [string, string, ...string[]] = isHome
+    ? ['#2a79e9', '#1d4ed8', '#1e3a8a']
+    : ['#2a79e9', '#2563eb'];
 
   return (
-    <View style={styles.card}>
+    <View style={styles.cardWrap}>
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.card}>
+        {isHome ? (
+          <Ionicons
+            name="pulse"
+            size={150}
+            color="rgba(255,255,255,0.06)"
+            style={styles.watermark}
+          />
+        ) : null}
       {/* ── TOP ROW: Live pill + wait time or QR ── */}
       <View style={styles.headerRow}>
         <View style={styles.livePill}>
@@ -218,21 +235,30 @@ export default function LiveQueueCard({
           </TouchableOpacity>
         </View>
       )}
+    </LinearGradient>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 20,
-    padding: 20,
+  cardWrap: {
+    borderRadius: 24,
     elevation: 4,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     marginBottom: 24,
+  },
+  card: {
+    borderRadius: 24,
+    padding: 20,
+    overflow: 'hidden',
+  },
+  watermark: {
+    position: 'absolute',
+    right: -24,
+    bottom: -20,
   },
 
   // Header
