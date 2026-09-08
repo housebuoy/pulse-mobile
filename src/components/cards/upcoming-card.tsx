@@ -9,9 +9,36 @@ interface UpcomingAppointmentCardProps {
   department: string;
   date: string; // e.g., "Oct 28, 2026"
   time: string; // e.g., "09:00 AM"
+  reference?: string; // e.g., APT-0049
+  paymentStatus?: string; // pending | paid | failed | refunded
 }
 
-export default function UpcomingAppointmentCard({ hospitalName, doctorName, department, date, time }: UpcomingAppointmentCardProps) {
+function PaymentChip({ status }: { status: string }) {
+  const cfg =
+    status === 'paid'
+      ? { bg: '#DCFCE7', fg: '#16A34A', label: 'Paid', icon: 'checkmark-circle' as const }
+      : status === 'failed'
+        ? { bg: '#FEE2E2', fg: '#DC2626', label: 'Payment failed', icon: 'alert-circle' as const }
+        : status === 'refunded'
+          ? { bg: '#E5E7EB', fg: '#4B5563', label: 'Refunded', icon: 'return-down-back' as const }
+          : { bg: '#FEF3C7', fg: '#B45309', label: 'Payment pending', icon: 'time' as const };
+  return (
+    <View style={[styles.statusChip, { backgroundColor: cfg.bg }]}>
+      <Ionicons name={cfg.icon} size={11} color={cfg.fg} />
+      <Text style={[styles.statusChipText, { color: cfg.fg }]}>{cfg.label}</Text>
+    </View>
+  );
+}
+
+export default function UpcomingAppointmentCard({
+  hospitalName,
+  doctorName,
+  department,
+  date,
+  time,
+  reference,
+  paymentStatus,
+}: UpcomingAppointmentCardProps) {
   return (
     <View style={styles.card}>
       {/* --- TOP TICKET SECTION (Vibrant) --- */}
@@ -22,9 +49,22 @@ export default function UpcomingAppointmentCard({ hospitalName, doctorName, depa
             <Text style={styles.pillText}>UPCOMING VISIT</Text>
           </View>
         </View>
-        
-        <Text style={styles.hospitalName} numberOfLines={1}>{hospitalName}</Text>
+
+        <Text style={styles.hospitalName} numberOfLines={1}>
+          {hospitalName || 'Pulse Health Facility'}
+        </Text>
         <Text style={styles.doctorInfo}>{department} • {doctorName}</Text>
+        {(reference || paymentStatus) && (
+          <View style={styles.chipRow}>
+            {reference ? (
+              <View style={[styles.statusChip, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                <Ionicons name="receipt-outline" size={11} color="#fff" />
+                <Text style={[styles.statusChipText, { color: '#fff' }]}>{reference}</Text>
+              </View>
+            ) : null}
+            {paymentStatus ? <PaymentChip status={paymentStatus} /> : null}
+          </View>
+        )}
       </View>
 
       {/* --- TICKET DIVIDER --- */}
@@ -86,6 +126,16 @@ const styles = StyleSheet.create({
     gap: 4 
   },
   pillText: { color: COLORS.primary, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  chipRow: { flexDirection: 'row', gap: 6, marginTop: 10, flexWrap: 'wrap' },
+  statusChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  statusChipText: { fontSize: 10, fontWeight: '700' },
   hospitalName: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 4 },
   doctorInfo: { fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
 
