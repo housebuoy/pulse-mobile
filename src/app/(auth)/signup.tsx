@@ -205,18 +205,18 @@ export default function SignUpScreen() {
             </TouchableOpacity>
 
             {/* --- DIVIDER --- */}
-            <View className="mb-8 flex-row items-center">
+            {/* <View className="mb-8 flex-row items-center">
               <View className="h-[1px] flex-1 bg-gray-200" />
               <Text className="px-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
                 Or continue with
               </Text>
               <View className="h-[1px] flex-1 bg-gray-200" />
-            </View>
+            </View> */}
 
             {/* --- SOCIAL BUTTONS --- */}
-            <View className="mb-8 flex-row justify-between gap-4 space-x-4">
+            {/* <View className="mb-8 flex-row justify-between gap-4 space-x-4">
               <TouchableOpacity className="flex-1 flex-row items-center justify-center rounded-2xl border border-gray-200 bg-white py-3.5">
-                {/* Replace the source here with wherever you saved that Google 'G' image! */}
+                
                 <GoogleIcon size={20} />
                 <Text className="ml-2 font-semibold text-gray-900">Google</Text>
               </TouchableOpacity>
@@ -225,7 +225,7 @@ export default function SignUpScreen() {
                 <Ionicons name="logo-apple" size={20} color="#111827" />
                 <Text className="ml-2 font-semibold text-gray-900">Apple</Text>
               </TouchableOpacity>
-            </View>
+            </View> */}
           </View>
 
           {/* --- SIGN IN LINK --- */}
