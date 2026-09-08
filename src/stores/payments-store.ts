@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Linking } from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { isMockMode } from '@/lib/use-mock';
 
 // PAY-AS-YOU-GO, booking-fee only. A booking is confirmed without instant
 // payment — it gets a PAY-BY deadline and shows up here as outstanding until
@@ -24,18 +25,19 @@ export interface OutstandingBooking {
 
 export type PaymentNetwork = 'mtn_momo' | 'telecel_cash' | 'card';
 
-// SAVE ONLY REFERENCES/TOKENS — never a raw card number, MoMo number, PIN, or
-// CVV. `last4` is purely a display aid the patient typed in to recognize the
-// method later; `gatewayToken` stands in for what a real gateway SDK
-// (Paystack/Hubtel/Flutterwave) would hand back after tokenizing the
-// instrument. Nothing sensitive ever touches this store.
+// Cards: save only last4 as a display aid — never a PAN, PIN or CVV.
+// MoMo wallets: save the full wallet number (a phone number, not a secret;
+// shown in full like every MoMo app). `gatewayToken` stands in for what a
+// real gateway SDK (Paystack/Hubtel/Flutterwave) would hand back after
+// tokenizing the instrument.
 export interface PaymentMethod {
   id: string;
   network: PaymentNetwork;
-  label: string; // e.g. "MTN MoMo •••• 4567"
+  label: string; // e.g. "MTN MoMo 0200433286" or "Card •••• 4567"
   last4: string;
   gatewayToken: string;
   isDefault: boolean;
+  accountNumber?: string | null;
 }
 
 export interface PaymentHistoryEntry {
@@ -59,7 +61,7 @@ interface PaymentsState {
   setPendingCheckoutBookingIds: (ids: string[]) => void;
   clearPendingCheckoutBookingIds: () => void;
 
-  addPaymentMethod: (network: PaymentNetwork, last4: string, brand?: string) => void;
+  addPaymentMethod: (network: PaymentNetwork, identifier: string, brand?: string) => Promise<void>;
   setDefaultPaymentMethod: (id: string) => void;
   removePaymentMethod: (id: string) => void;
 
@@ -136,19 +138,46 @@ export const usePaymentsStore = create<PaymentsState>()(
       setPendingCheckoutBookingIds: (ids) => set({ pendingCheckoutBookingIds: ids }),
       clearPendingCheckoutBookingIds: () => set({ pendingCheckoutBookingIds: [] }),
 
-      addPaymentMethod: (network, last4, brand) =>
-        set((state) => {
-          const labelPrefix = network === 'card' ? brand || 'Card' : NETWORK_LABEL[network];
+      addPaymentMethod: async (network, identifier, brand) => {
+        const isCard = network === 'card';
+        const digits = identifier.replace(/\D/g, '');
+        const labelPrefix = isCard ? brand || 'Card' : NETWORK_LABEL[network];
+        const isFirst = get().paymentMethods.length === 0;
+
+        if (isMockMode()) {
           const method: PaymentMethod = {
             id: makeId(),
             network,
-            label: `${labelPrefix} •••• ${last4}`,
-            last4,
+            label: isCard
+              ? `${labelPrefix} •••• ${digits.slice(-4)}`
+              : `${labelPrefix} ${identifier}`,
+            last4: digits.slice(-4),
             gatewayToken: makeMockToken(),
-            isDefault: state.paymentMethods.length === 0,
+            isDefault: isFirst,
+            accountNumber: isCard ? null : identifier,
           };
-          return { paymentMethods: [...state.paymentMethods, method] };
-        }),
+          set((state) => ({ paymentMethods: [...state.paymentMethods, method] }));
+          return;
+        }
+
+        // Real path: persist on the backend (checkout resolves methodId
+        // server-side, so a local-only method would fail to pay).
+        const { addPaymentMethodApi } = await import('@/lib/api/patient');
+        const created = await addPaymentMethodApi({
+          network,
+          ...(isCard ? { last4: digits } : { accountNumber: identifier }),
+        });
+        const method: PaymentMethod = {
+          id: created.id,
+          network: created.network,
+          label: created.label,
+          last4: created.last4,
+          gatewayToken: created.gatewayToken ?? '',
+          isDefault: created.isDefault,
+          accountNumber: created.accountNumber ?? (isCard ? null : identifier),
+        };
+        set((state) => ({ paymentMethods: [...state.paymentMethods, method] }));
+      },
 
       setDefaultPaymentMethod: (id) =>
         set((state) => ({
