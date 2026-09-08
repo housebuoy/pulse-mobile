@@ -82,16 +82,27 @@ function delay(ms: number): Promise<void> {
 // It's passed through as an opaque string so swapping to email/Ghana-Card
 // later is a one-line change at the call sites, not here.
 
-export async function requestPasswordReset(identifier: string): Promise<void> {
+/**
+ * Requests a password-reset code (BE-11, FE #33).
+ * Returns the backend's {@code devOtp} when the server runs in dev-echo mode
+ * (otp.dev-mode=true) so the app can surface it for hand-tests; production
+ * responses omit it.
+ */
+export async function requestPasswordReset(
+  identifier: string
+): Promise<{ devOtp?: string | null }> {
   if (isMockMode()) {
     await delay(600);
-    return;
+    return {};
   }
-  await apiRequest('/auth/patient/password-reset/request', {
-    method: 'POST',
-    auth: false,
-    body: { identifier },
-  });
+  return apiRequest<{ devOtp?: string | null }>(
+    '/auth/patient/password-reset/request',
+    {
+      method: 'POST',
+      auth: false,
+      body: { identifier },
+    }
+  );
 }
 
 export async function verifyPasswordResetOtp(
