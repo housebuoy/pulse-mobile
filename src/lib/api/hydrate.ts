@@ -53,7 +53,11 @@ export async function hydrateAfterLogin(): Promise<void> {
 
   if (ticketRes.status === 'fulfilled') {
     const ticket = ticketRes.value;
+    // Live truth wins in both directions: a real ticket replaces any stale
+    // one; a 404 (null) means no active queue, so clear instead of keeping a
+    // previous login's leftover card.
     if (ticket) useQueueStore.getState().setTicket(ticket);
+    else useQueueStore.getState().clearTicket();
   }
 
   if (paymentsRes.status === 'fulfilled') {
