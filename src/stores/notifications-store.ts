@@ -1,8 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
 
-export type NotificationType = 'payment_reminder' | 'queue_update' | 'booking_confirmation';
+export type NotificationType = 'appointment';
 
 export interface AppNotification {
   id: string;
@@ -11,69 +9,80 @@ export interface AppNotification {
   body: string;
   createdAt: string; // ISO datetime
   read: boolean;
+  link?: string | null;
 }
 
 interface NotificationsState {
   notifications: AppNotification[];
+  /** Unread count from the backend (/notifications/unread-count); -1 = not fetched yet. */
+  unreadCount: number;
+  /** Optimistic local flip; backend is source of truth and re-hydrates on focus. */
   markRead: (id: string) => void;
-  markAllRead: () => void;
+  /** Backend-backed: PATCHes then hydrates the returned full feed. */
+  markReadRemote: (id: string) => Promise<void>;
+  /** Backend-backed: POSTs read-all then hydrates the returned full feed. */
+  markAllReadRemote: () => Promise<void>;
   hydrateFromApi: (notifications: AppNotification[]) => void;
+  /** Fetches GET /notifications/unread-count and stores the backend count. */
+  syncUnreadCount: () => Promise<void>;
 }
 
-const hoursFromNow = (hours: number) => {
-  const d = new Date();
-  d.setHours(d.getHours() + hours);
-  return d.toISOString();
-};
+const countUnread = (notifications: AppNotification[]) =>
+  notifications.filter((n) => !n.read).length;
 
-export const useNotificationsStore = create<NotificationsState>()(
-  persist(
-    (set) => ({
-      notifications: [
-        {
-          id: 'seed-notif-1',
-          type: 'payment_reminder',
-          title: 'Payment due soon',
-          body: 'Pay for your KNUST University Hospital booking before 8:00 AM tomorrow or your slot is released.',
-          createdAt: hoursFromNow(-1),
-          read: false,
-        },
-        {
-          id: 'seed-notif-2',
-          type: 'queue_update',
-          title: 'Queue update',
-          body: "You're 2 patients away in the General OPD queue at KNUST University Hospital.",
-          createdAt: hoursFromNow(-3),
-          read: false,
-        },
-        {
-          id: 'seed-notif-3',
-          type: 'booking_confirmation',
-          title: 'Booking confirmed',
-          body: 'Your appointment with Dr. Arhin at KNUST University Hospital is confirmed for Oct 28, 09:00 AM.',
-          createdAt: hoursFromNow(-30),
-          read: true,
-        },
-      ],
+export const useNotificationsStore = create<NotificationsState>()((set) => ({
+  notifications: [],
+  unreadCount: -1,
 
-      markRead: (id) =>
-        set((state) => ({
-          notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-        })),
-
-      markAllRead: () =>
-        set((state) => ({
-          notifications: state.notifications.map((n) => ({ ...n, read: true })),
-        })),
-
-      hydrateFromApi: (notifications) => set({ notifications }),
+  markRead: (id) =>
+    set((state) => {
+      const notifications = state.notifications.map((n) =>
+        n.id === id ? { ...n, read: true } : n
+      );
+      return { notifications, unreadCount: countUnread(notifications) };
     }),
-    {
-      name: 'pulse-notifications-store',
-      storage: createJSONStorage(() => AsyncStorage),
+
+  markReadRemote: async (id) => {
+    // Optimistic flip for instant UI feedback, then reconcile with the server.
+    set((state) => {
+      const notifications = state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n));
+      return { notifications, unreadCount: countUnread(notifications) };
+    });
+    try {
+      const { markNotificationRead } = await import('@/lib/api/notifications');
+      const feed = await markNotificationRead(id);
+      set({ notifications: feed, unreadCount: countUnread(feed) });
+    } catch {
+      /* keep optimistic state */
     }
-  )
-);
+  },
+
+  markAllReadRemote: async () => {
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({ ...n, read: true })),
+      unreadCount: 0,
+    }));
+    try {
+      const { markAllNotificationsRead } = await import('@/lib/api/notifications');
+      const feed = await markAllNotificationsRead();
+      set({ notifications: feed, unreadCount: countUnread(feed) });
+    } catch {
+      /* keep optimistic state */
+    }
+  },
+
+  hydrateFromApi: (notifications) =>
+    set({ notifications, unreadCount: countUnread(notifications) }),
+
+  syncUnreadCount: async () => {
+    try {
+      const { getUnreadCount } = await import('@/lib/api/notifications');
+      set({ unreadCount: await getUnreadCount() });
+    } catch {
+      /* keep last known count */
+    }
+  },
+}));
 
 export const selectUnreadCount = (state: NotificationsState) =>
-  state.notifications.filter((n) => !n.read).length;
+  state.unreadCount >= 0 ? state.unreadCount : countUnread(state.notifications);

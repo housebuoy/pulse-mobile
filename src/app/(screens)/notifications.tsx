@@ -1,22 +1,47 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { COLORS } from '@/constants/theme';
 import { AppNotification, NotificationType, useNotificationsStore } from '@/stores/notifications-store';
+import { getNotifications } from '@/lib/api/notifications';
 
 const TYPE_ICON: Record<NotificationType, { name: keyof typeof Ionicons.glyphMap; bgColor: string; color: string }> = {
-  payment_reminder: { name: 'card-outline', bgColor: '#FEF3C7', color: COLORS.warning },
-  queue_update: { name: 'time-outline', bgColor: '#EFF6FF', color: COLORS.primary },
-  booking_confirmation: { name: 'checkmark-circle-outline', bgColor: '#DCFCE7', color: '#16A34A' },
+  appointment: { name: 'calendar-outline', bgColor: '#EFF6FF', color: COLORS.primary },
 };
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const notifications = useNotificationsStore((state) => state.notifications);
-  const markRead = useNotificationsStore((state) => state.markRead);
+  const markReadRemote = useNotificationsStore((state) => state.markReadRemote);
+  const markAllReadRemote = useNotificationsStore((state) => state.markAllReadRemote);
+  const hydrateFromApi = useNotificationsStore((state) => state.hydrateFromApi);
+  const [refreshing, setRefreshing] = useState(false);
+  const hasUnread = notifications.some((n) => !n.read);
+
+  const loadFeed = useCallback(async () => {
+    try {
+      const feed = await getNotifications();
+      hydrateFromApi(feed);
+    } catch {
+      /* keep whatever is already in the store */
+    }
+  }, [hydrateFromApi]);
+
+  // Refetch on every focus: returning from elsewhere must surface backend changes.
+  useFocusEffect(
+    useCallback(() => {
+      void loadFeed();
+    }, [loadFeed])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadFeed();
+    setRefreshing(false);
+  }, [loadFeed]);
 
   const sorted = useMemo(
     () => [...notifications].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
@@ -30,7 +55,13 @@ export default function NotificationsScreen() {
           <Ionicons name="chevron-back" size={24} color="#111827" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <View style={styles.backButton} />
+        <TouchableOpacity
+          onPress={() => void markAllReadRemote()}
+          disabled={!hasUnread}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Text style={[styles.markAllText, !hasUnread && styles.markAllDisabled]}>Mark all read</Text>
+        </TouchableOpacity>
       </View>
 
       {sorted.length === 0 ? (
@@ -41,12 +72,17 @@ export default function NotificationsScreen() {
           <Text style={styles.emptyTitle}>No notifications yet</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+          }>
           {sorted.map((notification) => (
             <NotificationCard
               key={notification.id}
               notification={notification}
-              onPress={() => markRead(notification.id)}
+              onPress={() => void markReadRemote(notification.id)}
             />
           ))}
         </ScrollView>
@@ -116,6 +152,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     color: '#111827',
+  },
+  markAllText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary,
+    paddingHorizontal: 8,
+  },
+  markAllDisabled: {
+    color: '#D1D5DB',
   },
   scrollContent: {
     paddingHorizontal: 20,
