@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { format, parseISO } from 'date-fns';
 import { COLORS } from '@/constants/theme';
 import SearchBar from '../../components/ui/search-bar';
@@ -40,12 +40,23 @@ export default function RecordsScreen() {
   const visits = useRecordsStore((state) => state.visits);
   const hydrateFromApi = useRecordsStore((state) => state.hydrateFromApi);
 
-  useEffect(() => {
-    import('@/lib/api/records')
-      .then(({ getRecords }) => getRecords())
-      .then(hydrateFromApi)
-      .catch(() => undefined);
+  const loadRecords = useCallback(async () => {
+    try {
+      const { getRecords } = await import('@/lib/api/records');
+      const data = await getRecords();
+      hydrateFromApi(data);
+    } catch {
+      // keep whatever is already in the store (offline / transient errors)
+    }
   }, [hydrateFromApi]);
+
+  // Refetch on every focus (same pattern as notifications/payments): a consult
+  // completed elsewhere shows up the moment the patient opens the Records tab.
+  useFocusEffect(
+    useCallback(() => {
+      void loadRecords();
+    }, [loadRecords])
+  );
   const labResults = useRecordsStore((state) => state.labResults);
   const prescriptions = useRecordsStore((state) => state.prescriptions);
 
