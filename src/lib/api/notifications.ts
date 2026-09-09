@@ -2,7 +2,10 @@ import { apiRequest } from '@/lib/api/client';
 
 export interface PatientNotification {
   id: string;
-  type: 'appointment';
+  // Known today: 'appointment' (consult completed / appointment updates) and
+  // 'queue' (the doctor has called the patient). Keep the string fallback so a
+  // future backend type can't break the app — unknown types render neutrally.
+  type: 'appointment' | 'queue' | (string & {});
   title: string;
   body: string;
   createdAt: string; // ISO datetime
