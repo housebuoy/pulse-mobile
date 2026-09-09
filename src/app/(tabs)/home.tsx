@@ -7,6 +7,9 @@ import {
   Platform,
   TouchableOpacity,
   FlatList,
+  Alert,
+  Animated,
+  LayoutAnimation,
   NativeSyntheticEvent,
   NativeScrollEvent,
   useWindowDimensions,
@@ -17,20 +20,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 
 // Import our Lego Blocks!
-import LiveQueueCard from '../../components/cards/live-queue-card';
 import SectionHeader from '../../components/shared/section-header';
 import VisitHistoryCard from '../../components/cards/visit-history';
 import HealthTipBanner from '../../components/cards/health-tip-banner';
 import DiscoveryCard from '@/components/cards/discovery-card';
 import UpcomingAppointmentCard from '@/components/cards/upcoming-card';
 import IconButton from '@/components/ui/header-badge';
-import { useQueueStore } from '@/stores/queue-store';
+import { useToast } from '@/components/ui/toast-provider';
 import { useProfileStore } from '@/stores/profile-store';
 import { selectUnreadCount, useNotificationsStore } from '@/stores/notifications-store';
-import { getAppointments } from '@/lib/api/appointments';
+import { getAppointments, cancelBooking } from '@/lib/api/appointments';
 import type { PatientAppointment } from '@/lib/api/appointments';
-import { getMyTicket } from '@/lib/api/queue';
-import type { QueueTicket } from '@/stores/queue-store';
 
 const UPCOMING_STATUSES = new Set(['scheduled', 'confirmed', 'checked_in']);
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -49,45 +49,79 @@ function fmtWhen(iso: string): { date: string; time: string } {
   return { date, time: `${h12}:${String(mm).padStart(2, '0')} ${hh >= 12 ? 'PM' : 'AM'}` };
 }
 
-type HeroPage =
-  | { kind: 'booking'; booking: PatientAppointment }
-  | { kind: 'live'; ticket: QueueTicket };
+/** True when two appointment lists carry identical display-relevant state —
+ *  lets the 10s poll skip setState (and the hero re-render) on no-change ticks. */
+function sameAppointmentList(a: PatientAppointment[], b: PatientAppointment[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.id !== y.id ||
+      x.reference !== y.reference ||
+      x.scheduledAt !== y.scheduledAt ||
+      x.paymentStatus !== y.paymentStatus ||
+      x.status !== y.status ||
+      x.departmentName !== y.departmentName ||
+      x.doctorName !== y.doctorName ||
+      (x.hospitalName ?? null) !== (y.hospitalName ?? null)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Smooth the outer layout when a card expands: the reveal itself is animated
+// inside the card (maxHeight), and this makes the surrounding FlatList/ScrollView
+// height follow on the same beat instead of snapping once the card grows.
+const animateLayout = () => {
+  try {
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(
+        240,
+        LayoutAnimation.Types.easeInEaseOut,
+        LayoutAnimation.Properties.opacity,
+      ),
+    );
+  } catch {
+    // New-arch/edge quirks — the in-card reveal animates on its own regardless.
+  }
+};
 
 export default function HomeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const cardWidth = width - 48; // matches ScrollView paddingHorizontal 24
-  const ticket = useQueueStore((state) => state.ticket);
-  const setTicket = useQueueStore((state) => state.setTicket);
-  const clearTicket = useQueueStore((state) => state.clearTicket);
   const identity = useProfileStore((state) => state.identity);
   const unreadNotifications = useNotificationsStore(selectUnreadCount);
   const syncUnreadCount = useNotificationsStore((state) => state.syncUnreadCount);
   const [appointments, setAppointments] = useState<PatientAppointment[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const refreshing = useRef(false);
-  const heroListRef = useRef<FlatList<HeroPage>>(null);
+  const heroListRef = useRef<FlatList<PatientAppointment>>(null);
   // Timestamp of the last manual swipe — autoplay backs off right after so it
   // never fights the user's finger.
   const lastDragAt = useRef(0);
+  const { show: showToast } = useToast();
+  // Booking card tapped open (one at a time). While set, autoplay pauses so
+  // the carousel never slides the expanded card out from under the user.
+  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (refreshing.current) return;
     refreshing.current = true;
     try {
-      // Bookings list + live ticket in one round so the hero carousel and the
-      // live-queue block always agree with each other.
-      const [bookings, myTicket] = await Promise.all([
-        getAppointments().catch(() => null), // keep last list on failure
-        getMyTicket().catch(() => null), // null on 404 (no active queue)
-      ]);
-      if (bookings) setAppointments(bookings);
-      if (myTicket) setTicket(myTicket);
-      else clearTicket();
+      const bookings = await getAppointments().catch(() => null); // keep last list on failure
+      if (bookings) {
+        // No-change poll ticks (same rows, same fields) must not replace the
+        // array — a fresh reference would re-render every hero page for nothing.
+        setAppointments((prev) => (sameAppointmentList(prev, bookings) ? prev : bookings));
+      }
     } finally {
       refreshing.current = false;
     }
-  }, [setTicket, clearTicket]);
+  }, []);
 
   // Keep the bell badge in sync with the backend unread count — on mount AND
   // on every Home focus, so returning from other tabs/screens refreshes the
@@ -107,34 +141,13 @@ export default function HomeScreen() {
     return () => clearInterval(id);
   }, [refresh]);
 
-  // Hero pages: every upcoming booking, ordered soonest-first. A booking that
-  // has an active queue ticket renders the live queue card instead of the
-  // plain upcoming card. A ticket with no matching booking (walk-in / seeded)
-  // still gets its own page so the patient never loses their ticket.
-  const pages = useMemo<HeroPage[]>(() => {
-    const upcoming = appointments
+  // Hero pages: every upcoming booking, ordered soonest-first. The live queue
+  // is NOT part of this carousel — it lives on the Live Queue tab.
+  const pages = useMemo<PatientAppointment[]>(() => {
+    return appointments
       .filter((a) => UPCOMING_STATUSES.has(a.status))
       .sort((a, b) => (a.scheduledAt < b.scheduledAt ? -1 : 1));
-    const liveId =
-      typeof ticket?.bookingId === 'number' ? String(ticket.bookingId) : null;
-    const ticketActive = Boolean(ticket?.hospitalName);
-
-    const result: HeroPage[] = [];
-    let matchedLive = false;
-    for (const booking of upcoming) {
-      const isLive = liveId !== null && liveId === booking.id;
-      if (isLive) matchedLive = true;
-      result.push(
-        isLive
-          ? { kind: 'live', ticket }
-          : { kind: 'booking', booking }
-      );
-    }
-    if (ticketActive && !matchedLive) {
-      result.unshift({ kind: 'live', ticket });
-    }
-    return result;
-  }, [appointments, ticket]);
+  }, [appointments]);
 
   // Clamp the carousel position when the page list shrinks (no setState-in-effect).
   const shownIndex = pages.length === 0 ? 0 : Math.min(heroIndex, pages.length - 1);
@@ -143,10 +156,17 @@ export default function HomeScreen() {
   // off for a few seconds after a manual swipe so autoplay never yanks the
   // carousel out from under the user's finger.
   useEffect(() => {
-    if (pages.length <= 1) return;
+    // No autoplay for a single page, and pause entirely while a booking card
+    // is expanded so the carousel never slides it out from under the user.
+    if (pages.length <= 1 || expandedBookingId) return;
     const id = setInterval(() => {
       if (Date.now() - lastDragAt.current < 6000) return;
       const next = (shownIndex + 1) % pages.length;
+      if (next === shownIndex) {
+        // Nothing to advance to (list shrank) — keep the index valid.
+        setHeroIndex(next);
+        return;
+      }
       heroListRef.current?.scrollToOffset({
         offset: next * cardWidth,
         animated: true,
@@ -154,10 +174,10 @@ export default function HomeScreen() {
       setHeroIndex(next);
     }, 5000);
     return () => clearInterval(id);
-  }, [pages.length, shownIndex, cardWidth]);
+  }, [pages.length, shownIndex, cardWidth, expandedBookingId]);
 
   const getItemLayout = useCallback(
-    (_: ArrayLike<HeroPage> | null | undefined, index: number) => ({
+    (_: ArrayLike<PatientAppointment> | null | undefined, index: number) => ({
       length: cardWidth,
       offset: cardWidth * index,
       index,
@@ -171,50 +191,121 @@ export default function HomeScreen() {
 
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / cardWidth);
-    if (idx !== heroIndex) setHeroIndex(idx);
+    if (idx !== heroIndex) {
+      // Manual swipe: close any expanded actions so autoplay can resume and
+      // no off-screen card stays open.
+      animateLayout();
+      setExpandedBookingId(null);
+      setHeroIndex(idx);
+    }
   };
 
-  const renderPage = ({ item }: { item: HeroPage }) => {
-    // Each page is exactly one card-width wide; without this the FlatList
-    // items shrink-wrap their content and the next card peeks in beside the
-    // current one ("stacked together"). Pinning the width makes paging land
-    // exactly one card per swipe.
-    if (item.kind === 'live') {
+  const goToPage = useCallback(
+    (index: number) => {
+      animateLayout();
+      setExpandedBookingId(null);
+      heroListRef.current?.scrollToOffset({
+        offset: index * cardWidth,
+        animated: true,
+      });
+      setHeroIndex(index);
+      lastDragAt.current = Date.now();
+    },
+    [cardWidth]
+  );
+
+  const toggleExpand = useCallback((bookingId: string) => {
+    animateLayout();
+    setExpandedBookingId((current) => (current === bookingId ? null : bookingId));
+  }, []);
+
+  const openReschedule = useCallback(
+    (booking: PatientAppointment) => {
+      const routeParams: Record<string, string> = { bookingId: booking.id };
+      if (booking.departmentId != null) routeParams.departmentId = String(booking.departmentId);
+      if (booking.hospitalId != null) routeParams.hospitalId = String(booking.hospitalId);
+      if (booking.hospitalName) routeParams.hospitalName = booking.hospitalName;
+      routeParams.departmentName = booking.departmentName;
+      routeParams.doctorName = booking.doctorName;
+      routeParams.reference = booking.reference;
+      routeParams.scheduledAt = booking.scheduledAt;
+      router.push({ pathname: '/(screens)/reschedule', params: routeParams });
+    },
+    [router]
+  );
+
+  const confirmCancelBooking = useCallback(
+    async (booking: PatientAppointment) => {
+      const ok = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          'Cancel appointment?',
+          `Booking ${booking.reference} will be cancelled and its slot released. This cannot be undone.`,
+          [
+            { text: 'Keep appointment', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Cancel appointment', style: 'destructive', onPress: () => resolve(true) },
+          ]
+        );
+      });
+      if (!ok) return;
+      try {
+        await cancelBooking(booking.id);
+        animateLayout();
+        setExpandedBookingId(null);
+        showToast({
+          title: 'Appointment cancelled',
+          body: `Booking ${booking.reference} was cancelled.`,
+          variant: 'success',
+          vibrate: true,
+        });
+        // Pull immediately so the card disappears now (the 10s poll would too).
+        void refresh();
+      } catch (e) {
+        showToast({
+          title: 'Could not cancel',
+          body: e instanceof Error ? e.message : 'Please try again.',
+          variant: 'error',
+        });
+      }
+    },
+    [refresh, showToast]
+  );
+
+  const keyExtractor = useCallback((item: PatientAppointment) => {
+    return `booking-${item.id}`;
+  }, []);
+
+  const renderPage = useCallback(
+    ({ item }: { item: PatientAppointment }) => {
+      // Each page is exactly one card-width wide; without this the FlatList
+      // items shrink-wrap their content and the next card peeks in beside the
+      // current one ("stacked together"). Pinning the width makes paging land
+      // exactly one card per swipe.
+      const when = fmtWhen(item.scheduledAt);
+      const booking = item;
+      const expanded = expandedBookingId === booking.id;
       return (
         <View style={{ width: cardWidth }}>
-          <LiveQueueCard
-            variant="home"
-            hospitalName={item.ticket.hospitalName}
-            department={item.ticket.department}
-            doctorName={item.ticket.doctorName}
-            waitTimeMins={item.ticket.waitTimeMins}
-            currentNumber={item.ticket.currentNumber}
-            userNumber={item.ticket.userNumber}
-            estimatedTime={item.ticket.estimatedTime}
-            bookingReference={item.ticket.bookingReference}
-            queueTotal={item.ticket.queueTotal}
-            aheadCount={item.ticket.aheadCount}
-            servedCount={item.ticket.servedCount}
-            onViewDetails={() => router.push('/(tabs)/queue')}
+          <UpcomingAppointmentCard
+            hospitalName={booking.hospitalName ?? ''}
+            department={booking.departmentName}
+            doctorName={booking.doctorName}
+            date={when.date}
+            time={when.time}
+            reference={booking.reference}
+            paymentStatus={booking.paymentStatus}
+            expanded={expanded}
+            showCancel={booking.paymentStatus === 'pending'}
+            onPress={() => toggleExpand(booking.id)}
+            onReschedule={() => openReschedule(booking)}
+            onCancel={() => {
+              void confirmCancelBooking(booking);
+            }}
           />
         </View>
       );
-    }
-    const when = fmtWhen(item.booking.scheduledAt);
-    return (
-      <View style={{ width: cardWidth }}>
-        <UpcomingAppointmentCard
-          hospitalName={item.booking.hospitalName ?? ''}
-          department={item.booking.departmentName}
-          doctorName={item.booking.doctorName}
-          date={when.date}
-          time={when.time}
-          reference={item.booking.reference}
-          paymentStatus={item.booking.paymentStatus}
-        />
-      </View>
-    );
-  };
+    },
+    [cardWidth, expandedBookingId, toggleExpand, openReschedule, confirmCancelBooking]
+  );
 
   // Dynamic greeting based on time of day
   const hour = new Date().getHours();
@@ -246,9 +337,7 @@ export default function HomeScreen() {
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 data={pages}
-                keyExtractor={(item, i) =>
-                  item.kind === 'live' ? `live-${i}` : `booking-${item.booking.id}`
-                }
+                keyExtractor={keyExtractor}
                 renderItem={renderPage}
                 snapToInterval={cardWidth}
                 decelerationRate="fast"
@@ -261,16 +350,9 @@ export default function HomeScreen() {
                 <View style={styles.dotsRow}>
                   {pages.map((p, i) => (
                     <TouchableOpacity
-                      key={p.kind === 'live' ? `dot-live-${i}` : `dot-${p.booking.id}`}
+                      key={`dot-${p.id}`}
                       hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-                      onPress={() => {
-                        lastDragAt.current = Date.now();
-                        heroListRef.current?.scrollToOffset({
-                          offset: i * cardWidth,
-                          animated: true,
-                        });
-                        setHeroIndex(i);
-                      }}
+                      onPress={() => goToPage(i)}
                       style={[styles.dot, i === shownIndex && styles.dotActive]}
                     />
                   ))}
@@ -297,17 +379,30 @@ export default function HomeScreen() {
               <Text style={styles.actionPillText}>My Appointments</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionPill}>
+            <TouchableOpacity
+              style={styles.actionPill}
+              onPress={() =>
+                router.push({ pathname: '/(tabs)/records', params: { tab: 'lab' } })
+              }
+              activeOpacity={0.7}>
               <Ionicons name="flask-outline" size={16} color={COLORS.primary} />
               <Text style={styles.actionPillText}>Lab Results</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionPill}>
+            <TouchableOpacity
+              style={styles.actionPill}
+              onPress={() =>
+                router.push({ pathname: '/(tabs)/records', params: { tab: 'prescriptions' } })
+              }
+              activeOpacity={0.7}>
               <Ionicons name="medical-outline" size={16} color={COLORS.primary} />
               <Text style={styles.actionPillText}>Prescriptions</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionPill}>
+            <TouchableOpacity
+              style={styles.actionPill}
+              onPress={() => router.push('/(screens)/payments')}
+              activeOpacity={0.7}>
               <Ionicons name="card-outline" size={16} color={COLORS.primary} />
               <Text style={styles.actionPillText}>Pay Bill</Text>
             </TouchableOpacity>

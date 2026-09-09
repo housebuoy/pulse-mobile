@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import type { ImageSourcePropType } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 interface HospitalCardProps {
@@ -9,14 +10,10 @@ interface HospitalCardProps {
   waitStatus: 'Low Wait' | 'Moderate Wait' | 'High Wait';
   nextSlot: string;
   rating: string;
-  imageUrl: string | null;
+  /** Resolved art — bundled asset or remote URL. See resolveHospitalImage(). */
+  imageSource: ImageSourcePropType;
   onPress: () => void;
 }
-
-// The backend seed has no hospital image URLs (image: null) — fall back to a
-// generic facility photo so cards never render blank (bug-triage FE-14).
-const FALLBACK_IMAGE =
-  'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?q=80&w=1000&auto=format&fit=crop';
 
 export default function HospitalCard({
   name,
@@ -25,7 +22,7 @@ export default function HospitalCard({
   waitStatus,
   nextSlot,
   rating,
-  imageUrl,
+  imageSource,
   onPress,
 }: HospitalCardProps) {
   // Determine badge colors based on wait status
@@ -41,11 +38,27 @@ export default function HospitalCard({
   };
   const badgeColors = getBadgeStyle();
 
+  // Fade the photo in once it decodes (local assets are instant; a remote
+  // fallback loads async over the network — until then the grey container
+  // shows instead of a blank white block).
+  const [fade] = useState(() => new Animated.Value(0));
+  const [loaded, setLoaded] = useState(false);
+  const handleLoad = () => {
+    if (loaded) return;
+    setLoaded(true);
+    Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+  };
+
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={onPress}>
       {/* Image & Distance Pill */}
       <View style={styles.imageContainer}>
-        <Image source={{ uri: imageUrl || FALLBACK_IMAGE }} style={styles.image} />
+        <Animated.Image
+          source={imageSource}
+          style={[styles.image, { opacity: fade }]}
+          resizeMode="cover"
+          onLoad={handleLoad}
+        />
         <View style={styles.distanceBadge}>
           <Ionicons name="navigate" size={12} color={COLORS.primary} />
           <Text style={styles.distanceText}>{distance}</Text>
@@ -93,6 +106,7 @@ const styles = StyleSheet.create({
     height: 140,
     width: '100%',
     position: 'relative',
+    backgroundColor: '#E5E7EB', // visible placeholder while a remote photo loads
   },
   image: {
     width: '100%',

@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { format, parseISO } from 'date-fns';
 import { COLORS } from '@/constants/theme';
 import SearchBar from '../../components/ui/search-bar';
@@ -32,20 +32,52 @@ const BANNER_HEIGHT = 90;
 type TabKey = 'Visits' | 'Lab Results' | 'Prescriptions';
 const TABS: TabKey[] = ['Visits', 'Lab Results', 'Prescriptions'];
 
+// Home quick-action pills deep-link here with ?tab=lab | ?tab=prescriptions.
+// Canonical tab labels are also accepted (a manual tab switch writes the
+// chosen label back into the param so a stale deep link never overrides it).
+const TAB_BY_PARAM: Record<string, TabKey> = {
+  lab: 'Lab Results',
+  prescriptions: 'Prescriptions',
+  Visits: 'Visits',
+  'Lab Results': 'Lab Results',
+  Prescriptions: 'Prescriptions',
+};
+
 export default function RecordsScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabKey>('Visits');
+  const params = useLocalSearchParams<{ tab?: string | string[] }>();
+  const [activeTabInternal, setActiveTabInternal] = useState<TabKey>('Visits');
+
+  // Resolve the route ?tab param to a valid tab (Home deep link), falling
+  // back to local state. Derived every render so a later push with new params
+  // lands on the requested section even though this tab stays mounted.
+  const requestedTab = (() => {
+    const raw = Array.isArray(params.tab) ? params.tab[0] : params.tab;
+    return raw ? (TAB_BY_PARAM[raw] ?? null) : null;
+  })();
+  const activeTab: TabKey = requestedTab ?? activeTabInternal;
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const visits = useRecordsStore((state) => state.visits);
   const hydrateFromApi = useRecordsStore((state) => state.hydrateFromApi);
 
-  useEffect(() => {
-    import('@/lib/api/records')
-      .then(({ getRecords }) => getRecords())
-      .then(hydrateFromApi)
-      .catch(() => undefined);
+  const loadRecords = useCallback(async () => {
+    try {
+      const { getRecords } = await import('@/lib/api/records');
+      const data = await getRecords();
+      hydrateFromApi(data);
+    } catch {
+      // keep whatever is already in the store (offline / transient errors)
+    }
   }, [hydrateFromApi]);
+
+  // Refetch on every focus (same pattern as notifications/payments): a consult
+  // completed elsewhere shows up the moment the patient opens the Records tab.
+  useFocusEffect(
+    useCallback(() => {
+      void loadRecords();
+    }, [loadRecords])
+  );
   const labResults = useRecordsStore((state) => state.labResults);
   const prescriptions = useRecordsStore((state) => state.prescriptions);
 
@@ -61,8 +93,11 @@ export default function RecordsScreen() {
   // anything on the Prescriptions tab), so switching tabs resets them. The
   // search text carries over — a typed query still makes sense elsewhere.
   const handleTabChange = (tab: string) => {
-    setActiveTab(tab as TabKey);
+    setActiveTabInternal(tab as TabKey);
     setFilter(DEFAULT_RECORDS_FILTER);
+    // Persist the selection into the route param (canonical label) so a
+    // previously set deep link (?tab=lab) never overrides a manual switch.
+    router.setParams({ tab });
   };
 
   const filteredVisits = useMemo(() => {

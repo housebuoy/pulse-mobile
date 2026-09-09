@@ -11,9 +11,14 @@ interface ToastBannerProps {
   title?: string;
   dismissible?: boolean;
   onDismiss?: () => void;
+  /** Makes the whole banner tappable (e.g. to open the notifications screen). */
+  onPress?: () => void;
   floating?: boolean; 
   duration?: number;
 }
+
+// Keep the entrance/exit animation while making the whole banner pressable.
+const AnimatedPressable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const VARIANT_CONFIG: Record<ToastVariant, any> = {
   info: { icon: 'information-circle', iconColor: '#2563EB', titleColor: '#1D4ED8', textColor: '#1E40AF', bg: '#EFF6FF', border: '#BFDBFE', defaultTitle: 'Info' },
@@ -29,6 +34,7 @@ export function ToastBanner({
   title,
   dismissible = true,
   onDismiss,
+  onPress,
   floating = false,
   duration = 5000,
 }: ToastBannerProps) {
@@ -77,14 +83,17 @@ export function ToastBanner({
 
   const config = VARIANT_CONFIG[variant];
   const displayTitle = title ?? config.defaultTitle;
+  const Root: any = onPress ? AnimatedPressable : Animated.View;
 
   return (
-    <Animated.View style={[
-      styles.container,
-      { backgroundColor: config.bg, borderColor: config.border },
-      floating && styles.floatingContainer,
-      floating && { transform: [{ translateY }], opacity, top: insets.top + -17 }
-    ]}>
+    <Root
+      style={[
+        styles.container,
+        { backgroundColor: config.bg, borderColor: config.border },
+        floating && styles.floatingContainer,
+        floating && { transform: [{ translateY }], opacity, top: insets.top + -17 }
+      ]}
+      {...(onPress ? { onPress, activeOpacity: 0.92 } : {})}>
       <Ionicons name={config.icon} size={20} color={config.iconColor} style={styles.icon} />
       <View style={styles.textBlock}>
         <Text style={[styles.title, { color: config.titleColor }]}>{displayTitle}</Text>
@@ -95,7 +104,7 @@ export function ToastBanner({
           <Ionicons name="close" size={16} color={config.iconColor} />
         </TouchableOpacity>
       )}
-    </Animated.View>
+    </Root>
   );
 }
 

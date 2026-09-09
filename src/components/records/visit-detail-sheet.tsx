@@ -9,6 +9,29 @@ interface VisitDetailSheetProps {
   onClose: () => void;
 }
 
+// Renderer accepts both the store's string[] shape and a plain string, so a
+// backend that sends either form degrades gracefully instead of crashing.
+function toLines(value: string[] | string | null | undefined): string[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function DetailLines({ label, lines }: { label: string; lines: string[] }) {
+  if (lines.length === 0) return null;
+  return (
+    <>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      <View style={styles.summaryBox}>
+        {lines.map((line, index) => (
+          <Text key={index} style={[styles.summaryText, index < lines.length - 1 && styles.lineGap]}>
+            {line}
+          </Text>
+        ))}
+      </View>
+    </>
+  );
+}
+
 export default function VisitDetailSheet({ visit, onClose }: VisitDetailSheetProps) {
   return (
     <RecordDetailSheet visible={!!visit} onClose={onClose} title={visit?.department ?? ''}>
@@ -22,6 +45,9 @@ export default function VisitDetailSheet({ visit, onClose }: VisitDetailSheetPro
           <View style={styles.summaryBox}>
             <Text style={styles.summaryText}>{visit.summary}</Text>
           </View>
+
+          <DetailLines label="Symptoms" lines={toLines(visit.symptoms)} />
+          <DetailLines label="Recommendations" lines={toLines(visit.recommendations)} />
         </>
       )}
     </RecordDetailSheet>
@@ -44,4 +70,5 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   summaryText: { fontSize: 14, color: '#374151', lineHeight: 22 },
+  lineGap: { marginBottom: 8 },
 });

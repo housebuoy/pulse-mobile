@@ -24,6 +24,7 @@ import { DEPARTMENTS } from '@/constants/departments';
 import { HospitalAvailability } from '@/services/mock/hospital-schedule';
 import { useBookingStore } from '@/stores/booking-store';
 import { useHospitalsStore } from '@/stores/hospitals-store';
+import { resolveHospitalImage } from '@/lib/hospital-images';
 
 // const { width, height } = Dimensions.get('window');
 const HEADER_HEIGHT = 280; // Total height of the image area
@@ -36,8 +37,9 @@ const FALLBACK_HOSPITAL = {
   location: 'University Road, Kumasi',
   rating: 4.8,
   reviews: '120+',
-  image:
-    'https://images.unsplash.com/photo-1587351021759-3e566b6af7cc?q=80&w=1000&auto=format&fit=crop',
+  // image art is resolved via resolveHospitalImage(id, image) so the hero
+  // matches the card the user tapped (bundled photos for known ids).
+  image: '',
   distance: '2.5 km',
   waitTime: 'Low',
   status: 'Open 24/7',
@@ -200,7 +202,10 @@ export default function HospitalDetailsScreen() {
       {/* 1. BACKGROUND HERO IMAGE (Fixed at the back) */}
       <Animated.View
         style={[styles.heroImageContainer, { transform: [{ translateY: imageTranslateY }] }]}>
-        <ImageBackground source={{ uri: HOSPITAL.image }} style={styles.heroImage} />
+        <ImageBackground
+          source={resolveHospitalImage(HOSPITAL.id, HOSPITAL.image)}
+          style={styles.heroImage}
+        />
       </Animated.View>
 
       {/* 2. FLOATING HEADER BUTTONS (Always on top) */}

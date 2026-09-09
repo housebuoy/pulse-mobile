@@ -27,3 +27,11 @@ export async function checkIn(): Promise<QueueTicket> {
   if (isMockMode()) return MOCK_TICKET;
   return apiRequest<QueueTicket>('/queue/me/check-in', { method: 'POST' });
 }
+
+/** Patient cancels their own active queue ticket (returns the ticket number). */
+export async function cancelTicket(): Promise<{ message?: string; ticketNumber?: string }> {
+  if (isMockMode()) return { message: 'Queue ticket cancelled' };
+  return apiRequest<{ message?: string; ticketNumber?: string }>('/queue/me/cancel', {
+    method: 'POST',
+  });
+}

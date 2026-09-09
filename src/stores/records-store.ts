@@ -14,6 +14,9 @@ export interface Visit {
   date: string; // ISO date
   doctor: string;
   summary: string;
+  /** Optional consult-note lines (backend adds these once a visit is completed). */
+  symptoms?: string[];
+  recommendations?: string[];
 }
 
 export interface LabValue {
@@ -39,6 +42,8 @@ export interface Prescription {
   prescribingDoctor: string;
   hospital: string;
   date: string; // ISO date
+  /** Optional take-home instructions as recorded by the clinician. */
+  instructions?: string;
 }
 
 interface RecordsState {

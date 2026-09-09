@@ -26,8 +26,11 @@ export default function PrescriptionDetailSheet({ prescription, onClose }: Presc
           <DetailFieldRow
             label="Date"
             value={format(parseISO(prescription.date), 'MMMM d, yyyy')}
-            isLast
+            isLast={!prescription.instructions}
           />
+          {prescription.instructions && (
+            <DetailFieldRow label="Instructions" value={prescription.instructions} isLast />
+          )}
         </>
       )}
     </RecordDetailSheet>

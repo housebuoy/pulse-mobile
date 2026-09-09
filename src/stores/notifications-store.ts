@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type NotificationType = 'appointment';
+export type NotificationType = 'appointment' | 'queue' | (string & {});
 
 export interface AppNotification {
   id: string;

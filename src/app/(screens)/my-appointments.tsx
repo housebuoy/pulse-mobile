@@ -23,6 +23,16 @@ const PENDING_BADGE: StatusBadge = { label: 'Unpaid', bg: '#FEF3C7', color: '#D9
 const FAILED_BADGE: StatusBadge = { label: 'Payment failed', bg: '#FEE2E2', color: '#DC2626' };
 const REFUNDED_BADGE: StatusBadge = { label: 'Refunded', bg: '#E5E7EB', color: '#374151' };
 
+// Cancelled/completed/no-show rows are informational history — nothing is owed
+// on them, so no payment badge is shown (the status badge still is). The
+// backend already excludes them from /outstanding; this is the appointments
+// list counterpart so a stale 'pending' never flashes "Unpaid" on them.
+const NO_PAYMENT_BADGE_STATUSES: ReadonlySet<AppointmentStatus> = new Set([
+  'cancelled',
+  'completed',
+  'no_show',
+]);
+
 function paymentBadge(status: PatientAppointment['paymentStatus']): StatusBadge {
   switch (status) {
     case 'paid':
@@ -142,7 +152,9 @@ function AppointmentCard({ appointment }: { appointment: PatientAppointment }) {
           </View>
           <Badge badge={status} />
         </View>
-        <Badge badge={paymentBadge(appointment.paymentStatus)} />
+        {!NO_PAYMENT_BADGE_STATUSES.has(appointment.status) && (
+          <Badge badge={paymentBadge(appointment.paymentStatus)} />
+        )}
       </View>
 
       <View style={styles.detailSection}>
