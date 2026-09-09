@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Vibration } from 'react-native';
 import { ToastBanner, ToastVariant } from './toast-banner';
 
 export interface ToastInput {
@@ -7,6 +7,8 @@ export interface ToastInput {
   body?: string;
   variant?: ToastVariant;
   onPress?: () => void;
+  /** Buzz the device when the toast appears (used for live alerts). */
+  vibrate?: boolean;
 }
 
 interface QueuedToast extends ToastInput {
@@ -56,6 +58,10 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
   }, [current, advance]);
 
   const show = useCallback((toast: ToastInput) => {
+    if (toast.vibrate) {
+      // Haptic attention-getter for live alerts (doctor calling, results in).
+      Vibration.vibrate(300);
+    }
     const id = nextToastId++;
     setToasts((list) => [...list, { ...toast, id }]);
   }, []);
