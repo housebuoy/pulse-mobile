@@ -140,26 +140,28 @@ function UpcomingAppointmentCard({
       {manage ? (
         <Animated.View style={{ maxHeight: actionsHeight, overflow: 'hidden' }}>
           <View style={styles.actionsDivider} />
-          <Pressable
-            onPress={onReschedule}
-            style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Reschedule appointment">
-            <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.actionPrimaryText}>Reschedule</Text>
-            <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.85)" />
-          </Pressable>
-          {showCancel ? (
+          <View style={styles.actionsBox}>
             <Pressable
-              onPress={onCancel}
-              style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
+              onPress={onReschedule}
+              style={({ pressed }) => [styles.actionRow, styles.actionReschedule, pressed && styles.actionRowPressed]}
               accessibilityRole="button"
-              accessibilityLabel="Cancel appointment">
-              <Ionicons name="close-circle-outline" size={18} color="#FECACA" />
-              <Text style={styles.actionCancelText}>Cancel appointment</Text>
-              <Ionicons name="chevron-forward" size={16} color="rgba(254,202,202,0.85)" />
+              accessibilityLabel="Reschedule appointment">
+              <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.actionPrimaryText}>Reschedule</Text>
+              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.85)" />
             </Pressable>
-          ) : null}
+            {showCancel ? (
+              <Pressable
+                onPress={onCancel}
+                style={({ pressed }) => [styles.actionRow, styles.actionCancel, pressed && styles.actionRowPressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel appointment">
+                <Ionicons name="close-circle-outline" size={18} color="#FEE2E2" />
+                <Text style={styles.actionCancelText}>Cancel appointment</Text>
+                <Ionicons name="chevron-forward" size={16} color="rgba(254,226,226,0.85)" />
+              </Pressable>
+            ) : null}
+          </View>
         </Animated.View>
       ) : null}
     </LinearGradient>
@@ -274,17 +276,28 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: 'rgba(255,255,255,0.35)',
     marginTop: 16,
-    marginBottom: 4,
+    marginBottom: 10,
   },
+  actionsBox: { gap: 8 },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 11,
-    paddingHorizontal: 4,
-    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
   },
-  actionRowPressed: { backgroundColor: 'rgba(255,255,255,0.10)' },
-  actionPrimaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', flex: 1 },
-  actionCancelText: { color: '#FECACA', fontSize: 15, fontWeight: '700', flex: 1 },
+  actionReschedule: {
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+  },
+  actionCancel: {
+    backgroundColor: 'rgba(254,226,226,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(254,226,226,0.35)',
+  },
+  actionRowPressed: { opacity: 0.8 },
+  actionPrimaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800', flex: 1 },
+  actionCancelText: { color: '#FEE2E2', fontSize: 15, fontWeight: '800', flex: 1 },
 });
