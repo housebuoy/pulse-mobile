@@ -6,10 +6,10 @@ import {
   ScrollView,
   Platform,
   TouchableOpacity,
-  Pressable,
   FlatList,
   Alert,
   Animated,
+  LayoutAnimation,
   NativeSyntheticEvent,
   NativeScrollEvent,
   useWindowDimensions,
@@ -98,59 +98,22 @@ function sameTicket(a: QueueTicket, b: QueueTicket): boolean {
   );
 }
 
-// Upper bound of the expanded actions panel — animate maxHeight up to this so
-// the reveal never clips while the content size is unknown ahead of layout.
-const ACTIONS_REVEAL_MAX = 220;
-
-/**
- * Slide-down actions revealed under an upcoming booking card: Reschedule on
- * every card, plus Cancel appointment while the booking is still unpaid.
- * Animated maxHeight keeps the FlatList row layout stable (no measurement).
- */
-function BookingActions({
-  expanded,
-  showCancel,
-  onReschedule,
-  onCancel,
-}: {
-  expanded: boolean;
-  showCancel: boolean;
-  onReschedule: () => void;
-  onCancel: () => void;
-}) {
-  const [progress] = useState(() => new Animated.Value(expanded ? 1 : 0));
-
-  useEffect(() => {
-    Animated.timing(progress, {
-      toValue: expanded ? 1 : 0,
-      duration: 220,
-      useNativeDriver: false,
-    }).start();
-  }, [expanded, progress]);
-
-  const revealHeight = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, ACTIONS_REVEAL_MAX],
-    extrapolate: 'clamp',
-  });
-
-  return (
-    <Animated.View style={{ maxHeight: revealHeight, overflow: 'hidden' }}>
-      <View style={styles.actionsPanel}>
-        <TouchableOpacity style={styles.actionsPrimary} onPress={onReschedule} activeOpacity={0.85}>
-          <Ionicons name="calendar-outline" size={17} color="#FFFFFF" />
-          <Text style={styles.actionsPrimaryText}>Reschedule</Text>
-        </TouchableOpacity>
-        {showCancel ? (
-          <TouchableOpacity style={styles.actionsCancel} onPress={onCancel} activeOpacity={0.85}>
-            <Ionicons name="close-circle-outline" size={17} color={COLORS.danger} />
-            <Text style={styles.actionsCancelText}>Cancel appointment</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
-    </Animated.View>
-  );
-}
+// Smooth the outer layout when a card expands: the reveal itself is animated
+// inside the card (maxHeight), and this makes the surrounding FlatList/ScrollView
+// height follow on the same beat instead of snapping once the card grows.
+const animateLayout = () => {
+  try {
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(
+        240,
+        LayoutAnimation.Types.easeInEaseOut,
+        LayoutAnimation.Properties.opacity,
+      ),
+    );
+  } catch {
+    // New-arch/edge quirks — the in-card reveal animates on its own regardless.
+  }
+};
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -291,6 +254,7 @@ export default function HomeScreen() {
     if (idx !== heroIndex) {
       // Manual swipe: close any expanded actions so autoplay can resume and
       // no off-screen card stays open.
+      animateLayout();
       setExpandedBookingId(null);
       setHeroIndex(idx);
     }
@@ -298,6 +262,7 @@ export default function HomeScreen() {
 
   const goToPage = useCallback(
     (index: number) => {
+      animateLayout();
       setExpandedBookingId(null);
       heroListRef.current?.scrollToOffset({
         offset: index * cardWidth,
@@ -310,6 +275,7 @@ export default function HomeScreen() {
   );
 
   const toggleExpand = useCallback((bookingId: string) => {
+    animateLayout();
     setExpandedBookingId((current) => (current === bookingId ? null : bookingId));
   }, []);
 
@@ -343,6 +309,7 @@ export default function HomeScreen() {
       if (!ok) return;
       try {
         await cancelBooking(booking.id);
+        animateLayout();
         setExpandedBookingId(null);
         showToast({
           title: 'Appointment cancelled',
@@ -399,24 +366,17 @@ export default function HomeScreen() {
       const expanded = expandedBookingId === booking.id;
       return (
         <View style={{ width: cardWidth }}>
-          <Pressable
-            onPress={() => toggleExpand(booking.id)}
-            style={({ pressed }) => (pressed ? styles.cardPressed : undefined)}
-            accessibilityRole="button"
-            accessibilityLabel={`Manage booking ${booking.reference}`}>
-            <UpcomingAppointmentCard
-              hospitalName={booking.hospitalName ?? ''}
-              department={booking.departmentName}
-              doctorName={booking.doctorName}
-              date={when.date}
-              time={when.time}
-              reference={booking.reference}
-              paymentStatus={booking.paymentStatus}
-            />
-          </Pressable>
-          <BookingActions
+          <UpcomingAppointmentCard
+            hospitalName={booking.hospitalName ?? ''}
+            department={booking.departmentName}
+            doctorName={booking.doctorName}
+            date={when.date}
+            time={when.time}
+            reference={booking.reference}
+            paymentStatus={booking.paymentStatus}
             expanded={expanded}
             showCancel={booking.paymentStatus === 'pending'}
+            onPress={() => toggleExpand(booking.id)}
             onReschedule={() => openReschedule(booking)}
             onCancel={() => {
               void confirmCancelBooking(booking);
@@ -658,39 +618,4 @@ const styles = StyleSheet.create({
     overflow: 'visible',
     gap: 16,
   },
-
-  // Hero booking-card actions (expanded panel)
-  cardPressed: {
-    opacity: 0.94,
-  },
-  actionsPanel: {
-    marginTop: -8, // closes the gap left by the card's own bottom margin
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 16,
-    padding: 10,
-    gap: 8,
-    marginBottom: 12,
-  },
-  actionsPrimary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
-  },
-  actionsPrimaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  actionsCancel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: COLORS.dangerBg,
-    borderRadius: 12,
-    paddingVertical: 12,
-  },
-  actionsCancelText: { color: COLORS.danger, fontSize: 15, fontWeight: '700' },
 });
