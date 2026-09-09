@@ -72,7 +72,8 @@ export default function QueueScreen() {
     },
   ];
 
-  // Placeholder actions
+  // Arrival + cancel actions live on the page (the queue card itself is
+  // display-only). Cancel actually calls the backend so the ticket is gone.
   const handleArrived = async () => {
     try {
       const { checkIn } = await import('@/lib/api/queue');
@@ -84,9 +85,25 @@ export default function QueueScreen() {
     }
   };
   const handleCancel = () =>
-    Alert.alert('Cancel Ticket', 'Are you sure you want to cancel your queue ticket?', [
-      { text: 'No' },
-      { text: 'Yes, Cancel', style: 'destructive' },
+    Alert.alert('Cancel ticket', 'Are you sure you want to leave the queue?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Yes, Cancel',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const { cancelTicket } = await import('@/lib/api/queue');
+            await cancelTicket();
+            clearTicket();
+            Alert.alert('Ticket cancelled', 'You have left the queue.');
+          } catch (e) {
+            Alert.alert(
+              'Could not cancel',
+              e instanceof Error ? e.message : 'Please try again at reception.'
+            );
+          }
+        },
+      },
     ]);
 
   return (
@@ -114,9 +131,8 @@ export default function QueueScreen() {
       {/* --- CONDITIONAL MAIN CONTENT --- */}
       {hasActiveQueue ? (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* 1. THE QUEUE CARD */}
+          {/* 1. THE QUEUE CARD (display-only — actions live below) */}
           <LiveQueueCard
-            variant="queue"
             hospitalName={ticket.hospitalName}
             department={ticket.department}
             doctorName={ticket.doctorName}
@@ -128,10 +144,20 @@ export default function QueueScreen() {
             queueTotal={ticket.queueTotal}
             aheadCount={ticket.aheadCount}
             servedCount={ticket.servedCount}
-            onArrived={handleArrived}
-            onCancel={handleCancel}
             onQRPress={() => Alert.alert('QR Code', 'Displaying full screen QR...')}
           />
+
+          {/* 1b. QUEUE ACTIONS — page level */}
+          <View style={styles.queueActionsRow}>
+            <TouchableOpacity style={styles.queueArriveBtn} onPress={handleArrived} activeOpacity={0.85}>
+              <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.primary} />
+              <Text style={styles.queueArriveText}>I have arrived</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.queueCancelBtn} onPress={handleCancel} activeOpacity={0.85}>
+              <Ionicons name="close-circle-outline" size={20} color={COLORS.danger} />
+              <Text style={styles.queueCancelText}>Cancel ticket</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* 2. MANAGE APPOINTMENT (Now using Horizontal Pills) */}
           <View style={styles.sectionSpacing}>
@@ -311,4 +337,47 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
+
+  // --- QUEUE ACTION BUTTONS (page level, below the card) ---
+  queueActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  queueArriveBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    paddingVertical: 14,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  queueArriveText: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  queueCancelBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 14,
+    paddingVertical: 14,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  queueCancelText: { fontSize: 14, fontWeight: '700', color: COLORS.danger },
 });
