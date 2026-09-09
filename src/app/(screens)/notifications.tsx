@@ -5,11 +5,22 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { COLORS } from '@/constants/theme';
-import { AppNotification, NotificationType, useNotificationsStore } from '@/stores/notifications-store';
+import { AppNotification, useNotificationsStore } from '@/stores/notifications-store';
 import { getNotifications } from '@/lib/api/notifications';
 
-const TYPE_ICON: Record<NotificationType, { name: keyof typeof Ionicons.glyphMap; bgColor: string; color: string }> = {
+type NotificationIconStyle = { name: keyof typeof Ionicons.glyphMap; bgColor: string; color: string };
+
+const TYPE_ICON: Record<string, NotificationIconStyle> = {
   appointment: { name: 'calendar-outline', bgColor: '#EFF6FF', color: COLORS.primary },
+  queue: { name: 'people-outline', bgColor: '#ECFDF5', color: '#059669' },
+};
+
+// Unknown/future backend types render with a neutral notification glyph rather
+// than crashing the icon lookup.
+const FALLBACK_ICON: NotificationIconStyle = {
+  name: 'notifications-outline',
+  bgColor: '#F3F4F6',
+  color: '#6B7280',
 };
 
 export default function NotificationsScreen() {
@@ -98,7 +109,7 @@ function NotificationCard({
   notification: AppNotification;
   onPress: () => void;
 }) {
-  const icon = TYPE_ICON[notification.type];
+  const icon = TYPE_ICON[notification.type] ?? FALLBACK_ICON;
   const timeLabel = formatDistanceToNowStrict(new Date(notification.createdAt), { addSuffix: true });
 
   return (
