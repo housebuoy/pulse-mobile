@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import SearchBar from '../../components/ui/search-bar';
@@ -10,6 +11,7 @@ import HospitalCard from '../../components/ui/hospital-card';
 import SectionHeader from '@/components/shared/section-header';
 import HospitalsFilterSheet from '@/components/book-appointment/hospitals-filter-sheet';
 import type { HospitalCard as HospitalCardData } from '@/lib/api/discovery';
+import { resolveHospitalImage } from '@/lib/hospital-images';
 import {
   DEFAULT_HOSPITALS_FILTER,
   HospitalsFilterState,
@@ -19,6 +21,40 @@ import {
 import { matchesQuery, uniqueSorted } from '@/utils/search';
 
 const BANNER_HEIGHT = 80;
+
+// The hospital list is small and near-static (demo seed) — show the last
+// snapshot immediately on repeat visits, then refresh in the background, so a
+// slow first request (e.g. Render cold start after idle) never blocks the
+// cards from painting.
+const HOSPITALS_CACHE_KEY = 'pulse_hospitals_list_v1';
+const HOSPITALS_CACHE_TTL_MS = 10 * 60 * 1000;
+
+interface CachedHospitals {
+  savedAt: number;
+  rows: HospitalCardData[];
+}
+
+async function readCachedHospitals(): Promise<CachedHospitals | null> {
+  try {
+    const raw = await AsyncStorage.getItem(HOSPITALS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedHospitals;
+    if (!parsed || typeof parsed.savedAt !== 'number' || !Array.isArray(parsed.rows)) return null;
+    if (Date.now() - parsed.savedAt > HOSPITALS_CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function writeHospitalsCache(rows: HospitalCardData[]): Promise<void> {
+  try {
+    const payload: CachedHospitals = { savedAt: Date.now(), rows };
+    await AsyncStorage.setItem(HOSPITALS_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    /* cache is best-effort — never block the UI on it */
+  }
+}
 
 export default function BookAppointmentScreen() {
   const router = useRouter();
@@ -34,20 +70,31 @@ export default function BookAppointmentScreen() {
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // Teammate's Data Fetching
+  // Load cached hospitals first (instant paint on repeat visits), then fetch
+  // the live list and refresh the cache in the background.
   useEffect(() => {
     let active = true;
-    import('@/lib/api/discovery')
-      .then(({ listHospitals }) => listHospitals())
-      .then((data) => {
-        if (active) setHospitals(data);
-      })
-      .catch(() => {
-        if (active) setHospitals([]);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    (async () => {
+      const cached = await readCachedHospitals();
+      if (!active) return;
+      if (cached) {
+        setHospitals(cached.rows);
+        setLoading(false);
+      }
+      try {
+        const { listHospitals } = await import('@/lib/api/discovery');
+        const fresh = await listHospitals();
+        if (!active) return;
+        setHospitals(fresh);
+        setLoading(false);
+        await writeHospitalsCache(fresh);
+      } catch {
+        if (active) {
+          if (!cached) setHospitals([]);
+          setLoading(false);
+        }
+      }
+    })();
     return () => {
       active = false;
     };
@@ -177,7 +224,7 @@ export default function BookAppointmentScreen() {
                 }
                 nextSlot="—"
                 rating={`${h.rating} (${h.reviews})`}
-                imageUrl={h.image}
+                imageSource={resolveHospitalImage(h.id, h.image)}
                 onPress={() =>
                   router.push({
                     pathname: '/(screens)/hospital-details',
