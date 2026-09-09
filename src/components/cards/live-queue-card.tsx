@@ -34,7 +34,7 @@ interface LiveQueueCardProps {
   servedCount?: number;
 }
 
-export default function LiveQueueCard({
+function LiveQueueCard({
   variant,
   hospitalName,
   department,
@@ -239,6 +239,8 @@ export default function LiveQueueCard({
     </View>
   );
 }
+
+export default React.memo(LiveQueueCard);
 
 const styles = StyleSheet.create({
   cardWrap: {
