@@ -16,7 +16,7 @@ interface QueuedToast extends ToastInput {
 }
 
 interface ToastContextValue {
-  /** Queue a toast. Toasts show one at a time; each auto-dismisses after ~3.5s. */
+  /** Queue a toast. Toasts show one at a time; each auto-dismisses after 5s. */
   show: (toast: ToastInput) => void;
 }
 
@@ -28,7 +28,7 @@ export function useToast(): ToastContextValue {
   return value;
 }
 
-const AUTO_DISMISS_MS = 3500;
+const AUTO_DISMISS_MS = 5000;
 
 // Module-level counter: toast ids only need to be unique within the app run.
 let nextToastId = 1;
