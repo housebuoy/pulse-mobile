@@ -12,7 +12,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GoogleIcon } from '@/components/ui/google-icon';
 import { COLORS } from '@/constants/theme';
 // Static imports (not `await import(...)`) — dynamic imports add Metro module
 // resolution latency to the sign-in tap and are a crash risk in Expo Go
@@ -129,30 +128,8 @@ export default function LoginScreen() {
                 {busy ? 'Signing in…' : 'Sign In'}
               </Text>
             </TouchableOpacity>
-
-            {/* --- DIVIDER --- */}
-            <View className="mb-8 flex-row items-center">
-              <View className="h-[1px] flex-1 bg-gray-200" />
-              <Text className="px-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Or continue with
-              </Text>
-              <View className="h-[1px] flex-1 bg-gray-200" />
-            </View>
-
-            {/* --- SOCIAL BUTTONS --- */}
-            <View className="mb-8 flex-row justify-between gap-4 space-x-4">
-              <TouchableOpacity className="flex-1 flex-row items-center justify-center rounded-2xl border border-gray-200 bg-white py-3.5">
-                {/* Replace the source here with wherever you saved that Google 'G' image! */}
-                <GoogleIcon size={20} />
-                <Text className="ml-2 font-semibold text-gray-900">Google</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity className="flex-1 flex-row items-center justify-center rounded-2xl border border-gray-200 bg-white py-3.5">
-                <Ionicons name="logo-apple" size={20} color="#111827" />
-                <Text className="ml-2 font-semibold text-gray-900">Apple</Text>
-              </TouchableOpacity>
-            </View>
           </View>
+
           {/* --- SIGN UP LINK --- */}
           <View className="mt-auto flex-row justify-center pb-8">
             <Text className="font-medium text-gray-500">Don&apos;t have an account? </Text>
