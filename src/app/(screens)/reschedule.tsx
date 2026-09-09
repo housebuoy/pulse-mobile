@@ -1,22 +1,125 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  AppState,
+  Linking,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { format, parseISO } from 'date-fns';
 import { COLORS } from '@/constants/theme';
 import CustomButton from '@/components/ui/custom-button';
-import { ToastBanner, ToastVariant } from '@/components/ui/toast-banner';
+import { ToastBanner } from '@/components/ui/toast-banner';
+import { useToast } from '@/components/ui/toast-provider';
 import MonthSelector from '@/components/book-appointment/month-selector';
 import DateStrip from '@/components/book-appointment/date-strip';
 import { HospitalAvailability, MockTimeSlot } from '@/services/mock/hospital-schedule';
 import { useQueueStore } from '@/stores/queue-store';
 import { useBookingStore } from '@/stores/booking-store';
+import { ApiError } from '@/lib/api/client';
 
 const HOSPITAL_ID = 'knust-university-hospital';
+const SURCHARGE_CODE = 'EARLIER_RESCHEDULE_SURCHARGE_REQUIRED';
+const SURCHARGE_LABEL = 'GH₵ 20';
+const RETRY_ATTEMPTS = 10; // ~30s of 3s retries after the checkout returns
+const RETRY_INTERVAL_MS = 3000;
+
+function firstString(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** Backend rejects earlier-slot moves with HTTP 402 + this code until the
+ *  surcharge is paid (frozen wave-2 contract). */
+function isSurchargeRequired(e: unknown): boolean {
+  if (!(e instanceof ApiError) || e.status !== 402) return false;
+  const body = e.body && typeof e.body === 'object' ? (e.body as { code?: unknown }) : {};
+  return body.code === SURCHARGE_CODE;
+}
+
+function errorMessage(e: unknown, fallback: string): string {
+  return e instanceof Error && e.message ? e.message : fallback;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function attemptReschedule(targetId: string, date: string, time: string): Promise<void> {
+  const { rescheduleBooking } = await import('@/lib/api/discovery');
+  await rescheduleBooking(targetId, date, time);
+}
+
+/** Ask whether to pay the earlier-reschedule surcharge now. */
+function confirmSurchargePrompt(): Promise<boolean> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      `Earlier reschedule requires ${SURCHARGE_LABEL}`,
+      `Moving this appointment to an earlier slot costs a ${SURCHARGE_LABEL} surcharge. Pay it now and we will apply the change automatically.`,
+      [
+        { text: 'Not now', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Pay & Reschedule', onPress: () => resolve(true) },
+      ]
+    );
+  });
+}
+
+/** Resolve when the app comes back to the foreground (hosted Aza checkout). */
+function waitForAppActive(): Promise<void> {
+  return new Promise((resolve) => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        sub.remove();
+        resolve();
+      }
+    });
+    // If the checkout never backgrounded the app (open failed / web mock),
+    // don't hang the confirm — start the retry loop shortly anyway.
+    setTimeout(() => {
+      sub.remove();
+      resolve();
+    }, 4000);
+  });
+}
+
+function fmtScheduled(iso: string): string {
+  try {
+    return format(parseISO(iso), 'MMM d, yyyy • h:mm a');
+  } catch {
+    return iso;
+  }
+}
 
 export default function RescheduleScreen() {
   const router = useRouter();
+  const { show } = useToast();
+  const params = useLocalSearchParams<{
+    bookingId?: string | string[];
+    departmentId?: string | string[];
+    hospitalName?: string | string[];
+    departmentName?: string | string[];
+    doctorName?: string | string[];
+    reference?: string | string[];
+    scheduledAt?: string | string[];
+  }>();
   const ticket = useQueueStore((state) => state.ticket);
+
+  // Wave-2: Home hero cards deep-link here with full booking context. The
+  // queue-tab entry point still passes nothing and falls back to the booking
+  // store's lastBookingId (today's behavior) so that path keeps working.
+  const routeBookingId = firstString(params.bookingId);
+  const routeDepartmentId = firstString(params.departmentId);
+  const routeDepartmentName = firstString(params.departmentName);
+  const routeDoctorName = firstString(params.doctorName);
+  const routeHospitalName = firstString(params.hospitalName);
+  const routeReference = firstString(params.reference);
+  const routeScheduledAt = firstString(params.scheduledAt);
 
   // State for the selected options
   const [selectedTime, setSelectedTime] = useState<string | null>('10:30 AM');
@@ -24,10 +127,7 @@ export default function RescheduleScreen() {
     new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-
-  const [toastData, setToastData] = useState<{ message: string; variant: ToastVariant } | null>(
-    null
-  );
+  const [submitting, setSubmitting] = useState(false);
 
   // --- Availability now comes from the shared mock service instead of a
   // hardcoded literal, so this screen and Hospital Details read the same
@@ -38,7 +138,7 @@ export default function RescheduleScreen() {
   useEffect(() => {
     let cancelled = false;
     setLoadingAvailability(true);
-    const deptId = useBookingStore.getState().departmentId ?? HOSPITAL_ID;
+    const deptId = routeDepartmentId ?? useBookingStore.getState().departmentId ?? HOSPITAL_ID;
     const from = currentMonth.toISOString().split('T')[0];
     import('@/lib/api/discovery')
       .then(({ getAvailability }) => getAvailability(deptId, from, 14))
@@ -54,20 +154,155 @@ export default function RescheduleScreen() {
     return () => {
       cancelled = true;
     };
-  }, [currentMonth]);
+  }, [currentMonth, routeDepartmentId]);
 
   const daySlots = availability?.slots[selectedDate] ?? { MORNING: [], AFTERNOON: [] };
 
+  // Display context: deep-link params win (no queue ticket on that path),
+  // then the live-queue ticket, then the booking store.
+  const deptLabel =
+    routeDepartmentName || ticket.department || useBookingStore.getState().department || '';
+  const doctorLabel = routeDoctorName || ticket.doctorName || '';
+  const hospitalLabel =
+    routeHospitalName || ticket.hospitalName || useBookingStore.getState().facilityName || '';
+  const referenceLabel = routeReference || ticket.bookingReference || '';
+
   const handleDateSelect = (fullDate: string) => {
     if (availability?.fullDates.includes(fullDate)) {
-    // Trigger the floating toast!
-    setToastData({ message: 'Dr. Arhin is fully booked on this date.', variant: 'error' });
-    return;
-    }else if (availability?.closedDates.includes(fullDate)) {
-      setToastData({ message: 'KNUST Hospital is closed on this date.', variant: 'error' });
+      show({ body: 'Dr. Arhin is fully booked on this date.', variant: 'error' });
+      return;
+    }
+    if (availability?.closedDates.includes(fullDate)) {
+      show({ body: 'KNUST Hospital is closed on this date.', variant: 'error' });
       return;
     }
     setSelectedDate(fullDate);
+  };
+
+  // 402 path: pick a saved method, open the hosted Aza checkout for the GH₵20
+  // surcharge, then retry the SAME PATCH until the webhook registers it.
+  const paySurchargeThenRetry = async (
+    targetId: string,
+    date: string,
+    time: string
+  ): Promise<'rescheduled' | 'pending' | 'no-method'> => {
+    const { getPaymentMethods } = await import('@/lib/api/patient');
+    const { payRescheduleSurcharge } = await import('@/lib/api/discovery');
+    const methods = await getPaymentMethods();
+    const method = methods.find((m) => m.isDefault) ?? methods[0];
+    if (!method) {
+      await new Promise<void>((resolve) => {
+        Alert.alert(
+          'Add a payment method',
+          'Paying the earlier-reschedule surcharge needs a saved payment method. Add one in Payments, then come back and confirm again.',
+          [
+            { text: 'Not now', style: 'cancel', onPress: () => resolve() },
+            {
+              text: 'Go to Payments',
+              onPress: () => {
+                resolve();
+                router.push('/(screens)/payments');
+              },
+            },
+          ]
+        );
+      });
+      return 'no-method';
+    }
+
+    const { checkoutUrl } = await payRescheduleSurcharge(targetId, method.id);
+    if (checkoutUrl) {
+      // Hosted Aza checkout backgrounds the app — no success alert here (same
+      // pattern as the payments screen, FE-25): confirm by re-running the
+      // PATCH once the patient returns to the app.
+      await Linking.openURL(checkoutUrl);
+    }
+    await waitForAppActive();
+
+    for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
+      await sleep(RETRY_INTERVAL_MS);
+      try {
+        await attemptReschedule(targetId, date, time);
+        return 'rescheduled';
+      } catch (e) {
+        if (!isSurchargeRequired(e)) throw e;
+      }
+    }
+
+    await new Promise<void>((resolve) => {
+      Alert.alert(
+        'Payment pending',
+        'The surcharge payment is still being confirmed. If you completed it, tap Confirm Reschedule again in a moment — otherwise the change was not applied.',
+        [{ text: 'OK', onPress: () => resolve() }]
+      );
+    });
+    return 'pending';
+  };
+
+  const handleConfirm = async () => {
+    if (submitting) return;
+    const date = selectedDate;
+    const time = selectedTime ?? '';
+    if (!date || !time) return;
+    setSubmitting(true);
+    try {
+      const store = useBookingStore.getState();
+      const targetId =
+        routeBookingId ??
+        store.lastBookingId ??
+        (ticket?.bookingId != null ? String(ticket.bookingId) : null);
+      if (!targetId) {
+        setSubmitting(false);
+        show({ body: 'No booking to reschedule.', variant: 'error' });
+        return;
+      }
+
+      // 1) Try the plain PATCH — succeeds unless the new slot is earlier
+      //    than the current one (backend answers HTTP 402).
+      let surchargeNeeded = false;
+      try {
+        await attemptReschedule(targetId, date, time);
+      } catch (e) {
+        if (!isSurchargeRequired(e)) {
+          setSubmitting(false);
+          show({ body: errorMessage(e, 'Reschedule failed'), variant: 'error' });
+          return;
+        }
+        surchargeNeeded = true;
+      }
+
+      if (surchargeNeeded) {
+        // 2) Pay the GH₵20 surcharge (hosted Aza checkout), then retry the
+        //    SAME request until the webhook registers the payment.
+        if (!(await confirmSurchargePrompt())) {
+          setSubmitting(false);
+          return;
+        }
+        let outcome: 'rescheduled' | 'pending' | 'no-method';
+        try {
+          outcome = await paySurchargeThenRetry(targetId, date, time);
+        } catch (e) {
+          setSubmitting(false);
+          show({ body: errorMessage(e, 'Surcharge payment failed. Try again.'), variant: 'error' });
+          return;
+        }
+        if (outcome !== 'rescheduled') {
+          setSubmitting(false); // 'no-method' / 'pending' already alerted the patient
+          return;
+        }
+        setSubmitting(false);
+        show({ body: 'Appointment rescheduled.', variant: 'success' });
+        router.back();
+        return;
+      }
+
+      setSubmitting(false);
+      show({ body: 'Appointment rescheduled.', variant: 'success' });
+      router.back();
+    } catch (e) {
+      setSubmitting(false);
+      show({ body: errorMessage(e, 'Reschedule failed'), variant: 'error' });
+    }
   };
 
   return (
@@ -87,24 +322,44 @@ export default function RescheduleScreen() {
           message="Rescheduling will forfeit your current spot in the Live Queue."
           dismissible={false}
         />
-        {toastData && (
-          <ToastBanner
-            floating={true}
-            variant={toastData.variant}
-            message={toastData.message}
-            onDismiss={() => setToastData(null)}
-          />
-        )}
 
         <View style={styles.summaryCard}>
           <View style={styles.iconContainer}>
             <Ionicons name="medical" size={20} color={COLORS.primary} />
           </View>
-          <View>
-            <Text style={styles.summaryTitle}>{ticket.department} • {ticket.doctorName}</Text>
-            <Text style={styles.summarySubtitle}>{ticket.hospitalName}</Text>
+          <View style={styles.summaryBody}>
+            <Text style={styles.summaryTitle}>
+              {deptLabel}
+              {doctorLabel ? ` • ${doctorLabel}` : ''}
+            </Text>
+            <Text style={styles.summarySubtitle}>{hospitalLabel}</Text>
+            {referenceLabel ? (
+              <Text style={styles.summaryMeta}>Booking {referenceLabel}</Text>
+            ) : null}
+            {routeScheduledAt ? (
+              <Text style={styles.summaryMeta}>Currently {fmtScheduled(routeScheduledAt)}</Text>
+            ) : null}
           </View>
         </View>
+
+        <View style={styles.consCard}>
+          <View style={styles.consHeader}>
+            <Ionicons name="warning-outline" size={16} color="#B45309" />
+            <Text style={styles.consTitle}>Cons of rescheduling</Text>
+          </View>
+          <Text style={styles.consItem}>
+            {'\u2022'} You may be assigned a different doctor.
+          </Text>
+          <Text style={styles.consItem}>
+            {'\u2022'} Your live-queue spot is forfeited — you rejoin at the back of the new
+            slot&apos;s queue.
+          </Text>
+          <Text style={styles.consItem}>
+            {'\u2022'} Moving to an EARLIER slot costs a {SURCHARGE_LABEL} surcharge, paid before
+            the change applies.
+          </Text>
+        </View>
+
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Select Date</Text>
           <MonthSelector
@@ -171,23 +426,9 @@ export default function RescheduleScreen() {
         <CustomButton
           title="Confirm Reschedule"
           disabled={!selectedDate || !selectedTime}
-          onPress={async () => {
-            try {
-              const { rescheduleBooking } = await import('@/lib/api/discovery');
-              const bookingId = useBookingStore.getState().lastBookingId;
-              if (!bookingId) {
-                setToastData({ message: 'No booking to reschedule.', variant: 'error' });
-                return;
-              }
-              await rescheduleBooking(bookingId, selectedDate, selectedTime ?? '');
-              setToastData({ message: 'Appointment rescheduled.', variant: 'success' });
-              router.back();
-            } catch (e) {
-              setToastData({
-                message: e instanceof Error ? e.message : 'Reschedule failed',
-                variant: 'error',
-              });
-            }
+          isLoading={submitting}
+          onPress={() => {
+            void handleConfirm();
           }}
         />
       </View>
@@ -223,25 +464,6 @@ const styles = StyleSheet.create({
     paddingBottom: 120, // Space for the sticky footer
   },
 
-  // Warning Banner
-  warningBanner: {
-    flexDirection: 'row',
-    backgroundColor: '#FEF3C7',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  warningText: {
-    flex: 1,
-    color: '#92400E',
-    fontSize: 14,
-    fontWeight: '500',
-    lineHeight: 20,
-  },
-
   // Summary Card
   summaryCard: {
     flexDirection: 'row',
@@ -249,11 +471,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     padding: 16,
     borderRadius: 16,
-    marginBottom: 32,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#F3F4F6',
     gap: 16,
   },
+  summaryBody: { flex: 1 },
   iconContainer: {
     width: 48,
     height: 48,
@@ -272,6 +495,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
   },
+  summaryMeta: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+    marginTop: 4,
+  },
+
+  // Cons of rescheduling notice
+  consCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    padding: 16,
+    marginBottom: 32,
+    gap: 6,
+  },
+  consHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  consTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  consItem: {
+    fontSize: 13,
+    color: '#78350F',
+    lineHeight: 19,
+    fontWeight: '500',
+  },
 
   // Date Selector
   sectionHeaderRow: {
@@ -284,54 +541,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: '#111827',
-  },
-  monthSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  monthText: {
-    color: COLORS.primary,
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  dateScroll: {
-    marginHorizontal: -20, // Allows the scroll to bleed to the edges
-    paddingHorizontal: 20,
-  },
-  dateCard: {
-    width: 64,
-    height: 80,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  dateCardActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  dayText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  dateNumber: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  textWhite: {
-    color: '#FFFFFF',
   },
 
   // Time Slots
