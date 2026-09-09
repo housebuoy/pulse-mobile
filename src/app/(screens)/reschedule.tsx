@@ -43,6 +43,13 @@ function isSurchargeRequired(e: unknown): boolean {
   return body.code === SURCHARGE_CODE;
 }
 
+/** 409-style slot conflict (taken/closed after the availability list was
+ *  fetched). Backend message: "That slot is no longer available…". */
+function isSlotNoLongerAvailable(e: unknown): boolean {
+  if (!(e instanceof ApiError) || e.status !== 409) return false;
+  return /no longer available|already taken|slot/i.test(e.message || '');
+}
+
 function errorMessage(e: unknown, fallback: string): string {
   return e instanceof Error && e.message ? e.message : fallback;
 }
@@ -225,7 +232,21 @@ export default function RescheduleScreen() {
         await attemptReschedule(targetId, date, time);
         return 'rescheduled';
       } catch (e) {
-        if (!isSurchargeRequired(e)) throw e;
+        if (isSurchargeRequired(e)) continue; // webhook not registered yet — keep retrying
+        // A slot that disappears between the availability list and the
+        // paid retry (409) must NOT surface as a scary error: the GH₵20
+        // surcharge is already paid and stays valid for the next attempt.
+        if (isSlotNoLongerAvailable(e)) {
+          await new Promise<void>((resolve) => {
+            Alert.alert(
+              'Slot was just taken',
+              'The earlier slot you picked became unavailable while the payment went through. Your GH₵20 surcharge is already paid and stays on this booking — choose another earlier slot and tap Confirm Reschedule again. You will not be charged twice.',
+              [{ text: 'OK', onPress: () => resolve() }]
+            );
+          });
+          return 'pending';
+        }
+        throw e;
       }
     }
 
