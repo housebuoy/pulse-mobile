@@ -34,9 +34,10 @@ function PaymentChip({ status }: { status: string }) {
 /**
  * Home hero "cover" — full-bleed gradient, oversized watermark and a bottom
  * scrim so the white content stays legible (matches the web carousel guide:
- * image card + fade + overlaid content + dots).
+ * image card + fade + overlaid content + dots). Memoized: hero pages re-render
+ * every 10s poll and this card must not when its display props are unchanged.
  */
-export default function UpcomingAppointmentCard({
+function UpcomingAppointmentCard({
   hospitalName,
   doctorName,
   department,
@@ -107,6 +108,8 @@ export default function UpcomingAppointmentCard({
     </View>
   );
 }
+
+export default React.memo(UpcomingAppointmentCard);
 
 const styles = StyleSheet.create({
   cardShadow: {
