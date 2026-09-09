@@ -6,7 +6,10 @@ import {
   ScrollView,
   Platform,
   TouchableOpacity,
+  Pressable,
   FlatList,
+  Alert,
+  Animated,
   NativeSyntheticEvent,
   NativeScrollEvent,
   useWindowDimensions,
@@ -24,10 +27,11 @@ import HealthTipBanner from '../../components/cards/health-tip-banner';
 import DiscoveryCard from '@/components/cards/discovery-card';
 import UpcomingAppointmentCard from '@/components/cards/upcoming-card';
 import IconButton from '@/components/ui/header-badge';
+import { useToast } from '@/components/ui/toast-provider';
 import { useQueueStore } from '@/stores/queue-store';
 import { useProfileStore } from '@/stores/profile-store';
 import { selectUnreadCount, useNotificationsStore } from '@/stores/notifications-store';
-import { getAppointments } from '@/lib/api/appointments';
+import { getAppointments, cancelBooking } from '@/lib/api/appointments';
 import type { PatientAppointment } from '@/lib/api/appointments';
 import { getMyTicket } from '@/lib/api/queue';
 import type { QueueTicket } from '@/stores/queue-store';
@@ -53,6 +57,101 @@ type HeroPage =
   | { kind: 'booking'; booking: PatientAppointment }
   | { kind: 'live'; ticket: QueueTicket };
 
+/** True when two appointment lists carry identical display-relevant state —
+ *  lets the 10s poll skip setState (and the hero re-render) on no-change ticks. */
+function sameAppointmentList(a: PatientAppointment[], b: PatientAppointment[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.id !== y.id ||
+      x.reference !== y.reference ||
+      x.scheduledAt !== y.scheduledAt ||
+      x.paymentStatus !== y.paymentStatus ||
+      x.status !== y.status ||
+      x.departmentName !== y.departmentName ||
+      x.doctorName !== y.doctorName ||
+      (x.hospitalName ?? null) !== (y.hospitalName ?? null)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function sameTicket(a: QueueTicket, b: QueueTicket): boolean {
+  return (
+    a.hospitalName === b.hospitalName &&
+    a.department === b.department &&
+    a.doctorName === b.doctorName &&
+    a.currentNumber === b.currentNumber &&
+    a.userNumber === b.userNumber &&
+    a.waitTimeMins === b.waitTimeMins &&
+    a.roomNumber === b.roomNumber &&
+    a.estimatedTime === b.estimatedTime &&
+    (a.bookingId ?? null) === (b.bookingId ?? null) &&
+    (a.bookingReference ?? null) === (b.bookingReference ?? null) &&
+    a.queueTotal === b.queueTotal &&
+    a.aheadCount === b.aheadCount &&
+    a.servedCount === b.servedCount
+  );
+}
+
+// Upper bound of the expanded actions panel — animate maxHeight up to this so
+// the reveal never clips while the content size is unknown ahead of layout.
+const ACTIONS_REVEAL_MAX = 220;
+
+/**
+ * Slide-down actions revealed under an upcoming booking card: Reschedule on
+ * every card, plus Cancel appointment while the booking is still unpaid.
+ * Animated maxHeight keeps the FlatList row layout stable (no measurement).
+ */
+function BookingActions({
+  expanded,
+  showCancel,
+  onReschedule,
+  onCancel,
+}: {
+  expanded: boolean;
+  showCancel: boolean;
+  onReschedule: () => void;
+  onCancel: () => void;
+}) {
+  const [progress] = useState(() => new Animated.Value(expanded ? 1 : 0));
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: expanded ? 1 : 0,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  }, [expanded, progress]);
+
+  const revealHeight = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, ACTIONS_REVEAL_MAX],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <Animated.View style={{ maxHeight: revealHeight, overflow: 'hidden' }}>
+      <View style={styles.actionsPanel}>
+        <TouchableOpacity style={styles.actionsPrimary} onPress={onReschedule} activeOpacity={0.85}>
+          <Ionicons name="calendar-outline" size={17} color="#FFFFFF" />
+          <Text style={styles.actionsPrimaryText}>Reschedule</Text>
+        </TouchableOpacity>
+        {showCancel ? (
+          <TouchableOpacity style={styles.actionsCancel} onPress={onCancel} activeOpacity={0.85}>
+            <Ionicons name="close-circle-outline" size={17} color={COLORS.danger} />
+            <Text style={styles.actionsCancelText}>Cancel appointment</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -70,6 +169,10 @@ export default function HomeScreen() {
   // Timestamp of the last manual swipe — autoplay backs off right after so it
   // never fights the user's finger.
   const lastDragAt = useRef(0);
+  const { show: showToast } = useToast();
+  // Booking card tapped open (one at a time). While set, autoplay pauses so
+  // the carousel never slides the expanded card out from under the user.
+  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (refreshing.current) return;
@@ -81,9 +184,16 @@ export default function HomeScreen() {
         getAppointments().catch(() => null), // keep last list on failure
         getMyTicket().catch(() => null), // null on 404 (no active queue)
       ]);
-      if (bookings) setAppointments(bookings);
-      if (myTicket) setTicket(myTicket);
-      else clearTicket();
+      if (bookings) {
+        // No-change poll ticks (same rows, same fields) must not replace the
+        // array — a fresh reference would re-render every hero page for nothing.
+        setAppointments((prev) => (sameAppointmentList(prev, bookings) ? prev : bookings));
+      }
+      if (myTicket) {
+        // Zustand action takes a value (no functional updater), so compare via
+        // getState and only write when the ticket actually changed.
+        if (!sameTicket(useQueueStore.getState().ticket, myTicket)) setTicket(myTicket);
+      } else clearTicket();
     } finally {
       refreshing.current = false;
     }
@@ -143,10 +253,17 @@ export default function HomeScreen() {
   // off for a few seconds after a manual swipe so autoplay never yanks the
   // carousel out from under the user's finger.
   useEffect(() => {
-    if (pages.length <= 1) return;
+    // No autoplay for a single page, and pause entirely while a booking card
+    // is expanded so the carousel never slides it out from under the user.
+    if (pages.length <= 1 || expandedBookingId) return;
     const id = setInterval(() => {
       if (Date.now() - lastDragAt.current < 6000) return;
       const next = (shownIndex + 1) % pages.length;
+      if (next === shownIndex) {
+        // Nothing to advance to (list shrank) — keep the index valid.
+        setHeroIndex(next);
+        return;
+      }
       heroListRef.current?.scrollToOffset({
         offset: next * cardWidth,
         animated: true,
@@ -154,7 +271,7 @@ export default function HomeScreen() {
       setHeroIndex(next);
     }, 5000);
     return () => clearInterval(id);
-  }, [pages.length, shownIndex, cardWidth]);
+  }, [pages.length, shownIndex, cardWidth, expandedBookingId]);
 
   const getItemLayout = useCallback(
     (_: ArrayLike<HeroPage> | null | undefined, index: number) => ({
@@ -171,50 +288,145 @@ export default function HomeScreen() {
 
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / cardWidth);
-    if (idx !== heroIndex) setHeroIndex(idx);
+    if (idx !== heroIndex) {
+      // Manual swipe: close any expanded actions so autoplay can resume and
+      // no off-screen card stays open.
+      setExpandedBookingId(null);
+      setHeroIndex(idx);
+    }
   };
 
-  const renderPage = ({ item }: { item: HeroPage }) => {
-    // Each page is exactly one card-width wide; without this the FlatList
-    // items shrink-wrap their content and the next card peeks in beside the
-    // current one ("stacked together"). Pinning the width makes paging land
-    // exactly one card per swipe.
-    if (item.kind === 'live') {
+  const goToPage = useCallback(
+    (index: number) => {
+      setExpandedBookingId(null);
+      heroListRef.current?.scrollToOffset({
+        offset: index * cardWidth,
+        animated: true,
+      });
+      setHeroIndex(index);
+      lastDragAt.current = Date.now();
+    },
+    [cardWidth]
+  );
+
+  const toggleExpand = useCallback((bookingId: string) => {
+    setExpandedBookingId((current) => (current === bookingId ? null : bookingId));
+  }, []);
+
+  const openReschedule = useCallback(
+    (booking: PatientAppointment) => {
+      const routeParams: Record<string, string> = { bookingId: booking.id };
+      if (booking.departmentId != null) routeParams.departmentId = String(booking.departmentId);
+      if (booking.hospitalId != null) routeParams.hospitalId = String(booking.hospitalId);
+      if (booking.hospitalName) routeParams.hospitalName = booking.hospitalName;
+      routeParams.departmentName = booking.departmentName;
+      routeParams.doctorName = booking.doctorName;
+      routeParams.reference = booking.reference;
+      routeParams.scheduledAt = booking.scheduledAt;
+      router.push({ pathname: '/(screens)/reschedule', params: routeParams });
+    },
+    [router]
+  );
+
+  const confirmCancelBooking = useCallback(
+    async (booking: PatientAppointment) => {
+      const ok = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          'Cancel appointment?',
+          `Booking ${booking.reference} will be cancelled and its slot released. This cannot be undone.`,
+          [
+            { text: 'Keep appointment', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Cancel appointment', style: 'destructive', onPress: () => resolve(true) },
+          ]
+        );
+      });
+      if (!ok) return;
+      try {
+        await cancelBooking(booking.id);
+        setExpandedBookingId(null);
+        showToast({
+          title: 'Appointment cancelled',
+          body: `Booking ${booking.reference} was cancelled.`,
+          variant: 'success',
+          vibrate: true,
+        });
+        // Pull immediately so the card disappears now (the 10s poll would too).
+        void refresh();
+      } catch (e) {
+        showToast({
+          title: 'Could not cancel',
+          body: e instanceof Error ? e.message : 'Please try again.',
+          variant: 'error',
+        });
+      }
+    },
+    [refresh, showToast]
+  );
+
+  const keyExtractor = useCallback((item: HeroPage, index: number) => {
+    return item.kind === 'live' ? `live-${index}` : `booking-${item.booking.id}`;
+  }, []);
+
+  const renderPage = useCallback(
+    ({ item }: { item: HeroPage }) => {
+      // Each page is exactly one card-width wide; without this the FlatList
+      // items shrink-wrap their content and the next card peeks in beside the
+      // current one ("stacked together"). Pinning the width makes paging land
+      // exactly one card per swipe.
+      if (item.kind === 'live') {
+        return (
+          <View style={{ width: cardWidth }}>
+            <LiveQueueCard
+              variant="home"
+              hospitalName={item.ticket.hospitalName}
+              department={item.ticket.department}
+              doctorName={item.ticket.doctorName}
+              waitTimeMins={item.ticket.waitTimeMins}
+              currentNumber={item.ticket.currentNumber}
+              userNumber={item.ticket.userNumber}
+              estimatedTime={item.ticket.estimatedTime}
+              bookingReference={item.ticket.bookingReference}
+              queueTotal={item.ticket.queueTotal}
+              aheadCount={item.ticket.aheadCount}
+              servedCount={item.ticket.servedCount}
+              onViewDetails={() => router.push('/(tabs)/queue')}
+            />
+          </View>
+        );
+      }
+      const when = fmtWhen(item.booking.scheduledAt);
+      const booking = item.booking;
+      const expanded = expandedBookingId === booking.id;
       return (
         <View style={{ width: cardWidth }}>
-          <LiveQueueCard
-            variant="home"
-            hospitalName={item.ticket.hospitalName}
-            department={item.ticket.department}
-            doctorName={item.ticket.doctorName}
-            waitTimeMins={item.ticket.waitTimeMins}
-            currentNumber={item.ticket.currentNumber}
-            userNumber={item.ticket.userNumber}
-            estimatedTime={item.ticket.estimatedTime}
-            bookingReference={item.ticket.bookingReference}
-            queueTotal={item.ticket.queueTotal}
-            aheadCount={item.ticket.aheadCount}
-            servedCount={item.ticket.servedCount}
-            onViewDetails={() => router.push('/(tabs)/queue')}
+          <Pressable
+            onPress={() => toggleExpand(booking.id)}
+            style={({ pressed }) => (pressed ? styles.cardPressed : undefined)}
+            accessibilityRole="button"
+            accessibilityLabel={`Manage booking ${booking.reference}`}>
+            <UpcomingAppointmentCard
+              hospitalName={booking.hospitalName ?? ''}
+              department={booking.departmentName}
+              doctorName={booking.doctorName}
+              date={when.date}
+              time={when.time}
+              reference={booking.reference}
+              paymentStatus={booking.paymentStatus}
+            />
+          </Pressable>
+          <BookingActions
+            expanded={expanded}
+            showCancel={booking.paymentStatus === 'pending'}
+            onReschedule={() => openReschedule(booking)}
+            onCancel={() => {
+              void confirmCancelBooking(booking);
+            }}
           />
         </View>
       );
-    }
-    const when = fmtWhen(item.booking.scheduledAt);
-    return (
-      <View style={{ width: cardWidth }}>
-        <UpcomingAppointmentCard
-          hospitalName={item.booking.hospitalName ?? ''}
-          department={item.booking.departmentName}
-          doctorName={item.booking.doctorName}
-          date={when.date}
-          time={when.time}
-          reference={item.booking.reference}
-          paymentStatus={item.booking.paymentStatus}
-        />
-      </View>
-    );
-  };
+    },
+    [cardWidth, expandedBookingId, toggleExpand, openReschedule, confirmCancelBooking, router]
+  );
 
   // Dynamic greeting based on time of day
   const hour = new Date().getHours();
@@ -246,9 +458,7 @@ export default function HomeScreen() {
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 data={pages}
-                keyExtractor={(item, i) =>
-                  item.kind === 'live' ? `live-${i}` : `booking-${item.booking.id}`
-                }
+                keyExtractor={keyExtractor}
                 renderItem={renderPage}
                 snapToInterval={cardWidth}
                 decelerationRate="fast"
@@ -263,14 +473,7 @@ export default function HomeScreen() {
                     <TouchableOpacity
                       key={p.kind === 'live' ? `dot-live-${i}` : `dot-${p.booking.id}`}
                       hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-                      onPress={() => {
-                        lastDragAt.current = Date.now();
-                        heroListRef.current?.scrollToOffset({
-                          offset: i * cardWidth,
-                          animated: true,
-                        });
-                        setHeroIndex(i);
-                      }}
+                      onPress={() => goToPage(i)}
                       style={[styles.dot, i === shownIndex && styles.dotActive]}
                     />
                   ))}
@@ -297,17 +500,30 @@ export default function HomeScreen() {
               <Text style={styles.actionPillText}>My Appointments</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionPill}>
+            <TouchableOpacity
+              style={styles.actionPill}
+              onPress={() =>
+                router.push({ pathname: '/(tabs)/records', params: { tab: 'lab' } })
+              }
+              activeOpacity={0.7}>
               <Ionicons name="flask-outline" size={16} color={COLORS.primary} />
               <Text style={styles.actionPillText}>Lab Results</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionPill}>
+            <TouchableOpacity
+              style={styles.actionPill}
+              onPress={() =>
+                router.push({ pathname: '/(tabs)/records', params: { tab: 'prescriptions' } })
+              }
+              activeOpacity={0.7}>
               <Ionicons name="medical-outline" size={16} color={COLORS.primary} />
               <Text style={styles.actionPillText}>Prescriptions</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionPill}>
+            <TouchableOpacity
+              style={styles.actionPill}
+              onPress={() => router.push('/(screens)/payments')}
+              activeOpacity={0.7}>
               <Ionicons name="card-outline" size={16} color={COLORS.primary} />
               <Text style={styles.actionPillText}>Pay Bill</Text>
             </TouchableOpacity>
@@ -442,4 +658,39 @@ const styles = StyleSheet.create({
     overflow: 'visible',
     gap: 16,
   },
+
+  // Hero booking-card actions (expanded panel)
+  cardPressed: {
+    opacity: 0.94,
+  },
+  actionsPanel: {
+    marginTop: -8, // closes the gap left by the card's own bottom margin
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    padding: 10,
+    gap: 8,
+    marginBottom: 12,
+  },
+  actionsPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  actionsPrimaryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  actionsCancel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COLORS.dangerBg,
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  actionsCancelText: { color: COLORS.danger, fontSize: 15, fontWeight: '700' },
 });
