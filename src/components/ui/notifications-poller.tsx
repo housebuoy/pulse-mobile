@@ -58,6 +58,7 @@ export default function NotificationsPoller() {
                 title: n.title,
                 body: n.body,
                 variant: n.type === 'queue' ? 'success' : 'info',
+                vibrate: true,
                 onPress: () => router.push(NOTIFICATIONS_ROUTE),
               });
             });
