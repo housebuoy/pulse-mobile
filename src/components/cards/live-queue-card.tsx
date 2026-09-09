@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 
@@ -24,6 +25,13 @@ interface LiveQueueCardProps {
   onArrived?: () => void;
   onCancel?: () => void;
   onQRPress?: () => void;
+
+  // Live queue position (backend QueueTicketResponse). When absent we fall
+  // back to ticket-digit arithmetic (legacy/older backend).
+  bookingReference?: string | null;
+  queueTotal?: number;
+  aheadCount?: number;
+  servedCount?: number;
 }
 
 export default function LiveQueueCard({
@@ -40,13 +48,47 @@ export default function LiveQueueCard({
   onArrived,
   onCancel,
   onQRPress,
+  bookingReference,
+  queueTotal,
+  aheadCount,
+  servedCount,
 }: LiveQueueCardProps) {
-  const patientsAhead = userNumber - currentNumber;
-  const progressPercentage = Math.min((currentNumber / userNumber) * 100, 100);
+  const hasPosition =
+    typeof aheadCount === 'number' && typeof servedCount === 'number';
+  const patientsAhead = hasPosition
+    ? aheadCount
+    : Math.max(userNumber - currentNumber, 0);
+  // Progress toward the patient's turn: served/(served+ahead) → 0% at
+  // check-in, ~100% when called. Falls back to ticket digits pre-deploy.
+  const progressPercentage = hasPosition
+    ? servedCount + aheadCount > 0
+      ? Math.min((servedCount / (servedCount + aheadCount)) * 100, 100)
+      : 0
+    : Math.min((currentNumber / userNumber) * 100, 100);
+  const inQueueLabel =
+    typeof queueTotal === 'number' && queueTotal > 0
+      ? ` · ${queueTotal} in queue`
+      : '';
   const isHome = variant === 'home';
+  const gradientColors: [string, string, ...string[]] = isHome
+    ? ['#2a79e9', '#1d4ed8', '#1e3a8a']
+    : ['#2a79e9', '#2563eb'];
 
   return (
-    <View style={styles.card}>
+    <View style={styles.cardWrap}>
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.card}>
+        {isHome ? (
+          <Ionicons
+            name="pulse"
+            size={150}
+            color="rgba(255,255,255,0.06)"
+            style={styles.watermark}
+          />
+        ) : null}
       {/* ── TOP ROW: Live pill + wait time or QR ── */}
       <View style={styles.headerRow}>
         <View style={styles.livePill}>
@@ -82,9 +124,12 @@ export default function LiveQueueCard({
       {isHome ? (
         // Home: both numbers side by side, equal weight, large labels above
         <View style={styles.numbersRowHome}>
-          <View>
+          <View style={styles.numberColHome}>
             <Text style={styles.numberLabelHome}>NOW SERVING</Text>
             <Text style={styles.numberValueHome}>#{currentNumber}</Text>
+            {inQueueLabel ? (
+              <Text style={styles.numberSubHome}>{queueTotal} in queue</Text>
+            ) : null}
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={styles.numberLabelHome}>YOUR NUMBER</Text>
@@ -97,6 +142,9 @@ export default function LiveQueueCard({
           <View style={styles.nowServingBlock}>
             <Text style={styles.nowServingLabel}>NOW SERVING</Text>
             <Text style={styles.nowServingValue}>#{currentNumber}</Text>
+            {inQueueLabel ? (
+              <Text style={styles.numberSubHome}>{queueTotal} in queue</Text>
+            ) : null}
           </View>
           <View style={styles.yourNumberBlock}>
             <Text style={styles.yourNumberLabel}>YOUR NUMBER</Text>
@@ -118,6 +166,13 @@ export default function LiveQueueCard({
       {!isHome && (
         <View style={styles.progressMeta}>
           <Text style={styles.progressLabel}>Progress</Text>
+          {hasPosition ? (
+            <Text style={styles.progressRight}>
+              {aheadCount > 0
+                ? `${aheadCount} ahead of you`
+                : 'your turn is next'}
+            </Text>
+          ) : null}
           {/* <Text style={styles.progressLabel}>{patientsAhead} patients ahead</Text> */}
         </View>
       )}
@@ -141,6 +196,14 @@ export default function LiveQueueCard({
               </Text>
             </View>
           )}
+          {bookingReference ? (
+            <View style={styles.detailRow}>
+              <Ionicons name="receipt-outline" size={16} color="#93C5FD" />
+              <Text style={styles.detailText}>
+                Booking <Text style={styles.detailBold}>{bookingReference}</Text>
+              </Text>
+            </View>
+          ) : null}
         </View>
       )}
 
@@ -172,21 +235,30 @@ export default function LiveQueueCard({
           </TouchableOpacity>
         </View>
       )}
+    </LinearGradient>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 20,
-    padding: 20,
+  cardWrap: {
+    borderRadius: 24,
     elevation: 4,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     marginBottom: 24,
+  },
+  card: {
+    borderRadius: 24,
+    padding: 20,
+    overflow: 'hidden',
+  },
+  watermark: {
+    position: 'absolute',
+    right: -24,
+    bottom: -20,
   },
 
   // Header
@@ -232,6 +304,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     marginBottom: 0,
+  },
+  numberColHome: { justifyContent: 'flex-end' },
+  numberSubHome: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
   numberLabelHome: {
     color: COLORS.primaryLight,
@@ -291,6 +370,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   progressLabel: { color: COLORS.primaryLight, fontSize: 11, fontWeight: '500' },
+  progressRight: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '600' },
   progressTrack: {
     height: 6,
     backgroundColor: 'rgba(0,0,0,0.2)',

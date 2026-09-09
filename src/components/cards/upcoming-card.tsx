@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '@/constants/theme';
 
 interface UpcomingAppointmentCardProps {
   hospitalName: string;
@@ -9,157 +9,189 @@ interface UpcomingAppointmentCardProps {
   department: string;
   date: string; // e.g., "Oct 28, 2026"
   time: string; // e.g., "09:00 AM"
+  reference?: string; // e.g., APT-0049
+  paymentStatus?: string; // pending | paid | failed | refunded
 }
 
-export default function UpcomingAppointmentCard({ hospitalName, doctorName, department, date, time }: UpcomingAppointmentCardProps) {
+// Solid chip colors read clearly on the gradient cover.
+function PaymentChip({ status }: { status: string }) {
+  const cfg =
+    status === 'paid'
+      ? { bg: '#DCFCE7', fg: '#16A34A', label: 'Paid', icon: 'checkmark-circle' as const }
+      : status === 'failed'
+        ? { bg: '#FEE2E2', fg: '#DC2626', label: 'Payment failed', icon: 'alert-circle' as const }
+        : status === 'refunded'
+          ? { bg: '#E5E7EB', fg: '#4B5563', label: 'Refunded', icon: 'return-down-back' as const }
+          : { bg: '#FEF3C7', fg: '#B45309', label: 'Payment pending', icon: 'time' as const };
   return (
-    <View style={styles.card}>
-      {/* --- TOP TICKET SECTION (Vibrant) --- */}
-      <View style={styles.topSection}>
-        <View style={styles.headerRow}>
+    <View style={[styles.statusChip, { backgroundColor: cfg.bg }]}>
+      <Ionicons name={cfg.icon} size={11} color={cfg.fg} />
+      <Text style={[styles.statusChipText, { color: cfg.fg }]}>{cfg.label}</Text>
+    </View>
+  );
+}
+
+/**
+ * Home hero "cover" — full-bleed gradient, oversized watermark and a bottom
+ * scrim so the white content stays legible (matches the web carousel guide:
+ * image card + fade + overlaid content + dots).
+ */
+export default function UpcomingAppointmentCard({
+  hospitalName,
+  doctorName,
+  department,
+  date,
+  time,
+  reference,
+  paymentStatus,
+}: UpcomingAppointmentCardProps) {
+  const [month, dayRaw] = date.split(' ');
+  const day = (dayRaw ?? '').replace(',', '');
+
+  return (
+    <View style={styles.cardShadow}>
+      <LinearGradient
+        colors={['#2a79e9', '#1d4ed8', '#1729a8']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.card}>
+        {/* Oversized watermark */}
+        <Ionicons
+          name="calendar"
+          size={150}
+          color="rgba(255,255,255,0.07)"
+          style={styles.watermark}
+        />
+        {/* Bottom scrim for legibility */}
+        <LinearGradient
+          colors={['transparent', 'rgba(2,6,23,0.28)']}
+          style={styles.scrim}
+        />
+
+        {/* Top row: label pill + payment chip */}
+        <View style={styles.topRow}>
           <View style={styles.pill}>
-            <Ionicons name="calendar" size={12} color={COLORS.primary} />
+            <Ionicons name="calendar" size={12} color="#fff" />
             <Text style={styles.pillText}>UPCOMING VISIT</Text>
           </View>
+          {paymentStatus ? <PaymentChip status={paymentStatus} /> : null}
         </View>
-        
-        <Text style={styles.hospitalName} numberOfLines={1}>{hospitalName}</Text>
-        <Text style={styles.doctorInfo}>{department} • {doctorName}</Text>
-      </View>
 
-      {/* --- TICKET DIVIDER --- */}
-      <View style={styles.dividerContainer}>
-        {/* <View style={styles.notchLeft} /> */}
-        <View style={styles.dashedLine} />
-        {/* <View style={styles.notchRight} /> */}
-      </View>
+        {/* Identity */}
+        <Text style={styles.hospitalName} numberOfLines={1}>
+          {hospitalName || 'Pulse Health Facility'}
+        </Text>
+        <Text style={styles.doctorInfo} numberOfLines={1}>
+          {department} • {doctorName}
+        </Text>
 
-      {/* --- BOTTOM SECTION (Details) --- */}
-      <View style={styles.bottomSection}>
-        <View style={styles.timeBlock}>
-          <View style={styles.dateBox}>
-            <Text style={styles.dateMonth}>{date.split(' ')[0]}</Text>
-            <Text style={styles.dateDay}>{date.split(' ')[1].replace(',', '')}</Text>
+        {reference ? (
+          <View style={styles.referenceChip}>
+            <Ionicons name="receipt-outline" size={11} color="#fff" />
+            <Text style={styles.referenceText}>{reference}</Text>
           </View>
-          <View style={styles.timeInfo}>
+        ) : null}
+
+        {/* Bottom: when + check-in hint */}
+        <View style={styles.bottomRow}>
+          <View style={styles.dateBlock}>
+            <Text style={styles.dateMonth}>{month}</Text>
+            <Text style={styles.dateDay}>{day}</Text>
+          </View>
+          <View style={styles.timeCol}>
             <Text style={styles.timeText}>{time}</Text>
-            <Text style={styles.timeSubtext}>Expected Arrival</Text>
+            <Text style={styles.timeSubtext}>Digital check-in opens 30 mins before</Text>
           </View>
         </View>
-        
-        <View style={styles.footerInfo}>
-          <Ionicons name="scan-outline" size={16} color={COLORS.primary} />
-          <Text style={styles.footerText}>Digital check-in opens 30 mins before</Text>
-        </View>
-      </View>
+      </LinearGradient>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
+  cardShadow: {
+    borderRadius: 24,
+    elevation: 6,
+    shadowColor: '#1d4ed8',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
     marginBottom: 24,
-    elevation: 4,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
   },
-  
-  // Top Colored Section
-  topSection: {
-    backgroundColor: COLORS.primary,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+  card: {
+    borderRadius: 24,
     padding: 20,
+    overflow: 'hidden',
   },
-  headerRow: { marginBottom: 12, alignItems: 'flex-start' },
-  pill: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: '#fff', 
-    paddingHorizontal: 10, 
-    paddingVertical: 5, 
-    borderRadius: 999, 
-    gap: 4 
+  watermark: {
+    position: 'absolute',
+    right: -30,
+    bottom: -28,
   },
-  pillText: { color: COLORS.primary, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  hospitalName: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 4 },
-  doctorInfo: { fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
-
-  // Ticket Divider Effect
-  dividerContainer: {
+  scrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 96,
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+    gap: 8,
+  },
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    height: 20,
-    position: 'relative',
-    zIndex: 1,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    gap: 4,
   },
-  notchLeft: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#FAFAFA', // Matches your home screen background
-    position: 'absolute',
-    left: -10,
-  },
-  notchRight: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#FAFAFA',
-    position: 'absolute',
-    right: -10,
-  },
-  dashedLine: {
-    flex: 1,
-    height: 1,
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginHorizontal: 15,
-  },
-
-  // Bottom Section
-  bottomSection: {
-    padding: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-  },
-  timeBlock: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 16, 
-    marginBottom: 16 
-  },
-  dateBox: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  pillText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  statusChip: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#DBEAFE'
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
-  dateMonth: { color: COLORS.primary, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
-  dateDay: { color: COLORS.primary, fontSize: 24, fontWeight: '900' },
-  timeInfo: { flex: 1 },
-  timeText: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  timeSubtext: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  
-  footerInfo: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center',
-    gap: 8, 
-    backgroundColor: '#F9FAFB', 
-    padding: 12, 
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6'
+  statusChipText: { fontSize: 10, fontWeight: '800' },
+  hospitalName: { fontSize: 21, fontWeight: '800', color: '#fff', marginBottom: 3 },
+  doctorInfo: { fontSize: 13, color: 'rgba(255,255,255,0.78)', fontWeight: '600' },
+  referenceChip: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    marginTop: 8,
   },
-  footerText: { fontSize: 12, fontWeight: '600', color: '#4B5563' },
+  referenceText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 18,
+  },
+  dateBlock: {
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 14,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    minWidth: 62,
+  },
+  dateMonth: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  dateDay: { color: '#fff', fontSize: 26, fontWeight: '900', lineHeight: 30 },
+  timeCol: { flex: 1 },
+  timeText: { fontSize: 17, fontWeight: '800', color: '#fff' },
+  timeSubtext: { fontSize: 11, color: 'rgba(255,255,255,0.72)', fontWeight: '500', marginTop: 2 },
 });

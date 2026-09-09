@@ -16,6 +16,7 @@ export default function QueueScreen() {
   const router = useRouter();
   const ticket = useQueueStore((state) => state.ticket);
   const setTicket = useQueueStore((state) => state.setTicket);
+  const clearTicket = useQueueStore((state) => state.clearTicket);
   const unreadNotifications = useNotificationsStore(selectUnreadCount);
 
   useEffect(() => {
@@ -24,9 +25,15 @@ export default function QueueScreen() {
       try {
         const { getMyTicket } = await import('@/lib/api/queue');
         const next = await getMyTicket();
-        if (!cancelled && next) setTicket(next);
+        if (!cancelled) {
+          // Live truth in both directions: a real ticket replaces the last
+          // one; a 404 (null) means the queue is gone → clear the card so a
+          // stale ticket from another session/day never lingers.
+          if (next) setTicket(next);
+          else clearTicket();
+        }
       } catch {
-        /* keep last ticket */
+        /* keep last ticket on transient errors */
       }
     };
     void poll();
@@ -35,7 +42,7 @@ export default function QueueScreen() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [setTicket]);
+  }, [setTicket, clearTicket]);
 
   // Check if we actually have an active queue ticket
   const hasActiveQueue = ticket && ticket.hospitalName;
@@ -117,6 +124,10 @@ export default function QueueScreen() {
             userNumber={ticket.userNumber}
             waitTimeMins={ticket.waitTimeMins}
             roomNumber={ticket.roomNumber}
+            bookingReference={ticket.bookingReference}
+            queueTotal={ticket.queueTotal}
+            aheadCount={ticket.aheadCount}
+            servedCount={ticket.servedCount}
             onArrived={handleArrived}
             onCancel={handleCancel}
             onQRPress={() => Alert.alert('QR Code', 'Displaying full screen QR...')}

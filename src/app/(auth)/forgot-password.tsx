@@ -37,8 +37,15 @@ export default function ForgotPasswordScreen() {
     }
     setBusy(true);
     try {
-      await requestPasswordReset(trimmed);
-      router.push({ pathname: '/(auth)/otp', params: { phone: trimmed, context: 'reset' } });
+      const res = await requestPasswordReset(trimmed);
+      router.push({
+        pathname: '/(auth)/otp',
+        params: {
+          phone: trimmed,
+          context: 'reset',
+          devOtp: res.devOtp ?? '',
+        },
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not send reset code');
     } finally {
