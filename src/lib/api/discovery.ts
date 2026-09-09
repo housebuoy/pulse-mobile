@@ -156,3 +156,23 @@ export async function rescheduleBooking(bookingId: string, newDate: string, newT
     body: { newDate, newTime: slotTimeToIso(newTime) },
   });
 }
+
+/**
+ * Wave-2: moving a booking to an EARLIER slot is rejected with HTTP 402
+ * (code EARLIER_RESCHEDULE_SURCHARGE_REQUIRED) until the patient pays the
+ * GH₵20 surcharge. This POST returns a hosted Aza checkout for exactly that
+ * amount (same {checkoutUrl, sessionId} shape as /patients/me/payments);
+ * after the webhook confirms it, the original PATCH retry succeeds.
+ */
+export async function payRescheduleSurcharge(
+  bookingId: string,
+  methodId: string | number
+): Promise<{ checkoutUrl: string; sessionId: string }> {
+  if (isMockMode()) {
+    return { checkoutUrl: 'https://pay.aza.systems/c/mock', sessionId: 'cs_mock' };
+  }
+  return apiRequest(`/bookings/${bookingId}/reschedule/surcharge`, {
+    method: 'POST',
+    body: { methodId: Number(methodId) },
+  });
+}
